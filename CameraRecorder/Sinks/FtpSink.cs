@@ -19,6 +19,12 @@ public sealed class FtpSink : IStorageSink
 
     public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
     {
+        if (!_settings.FtpEnabled)
+        {
+            _logger.LogDebug("FtpSink: FTP отключён, пропускаю");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_settings.FtpHost))
         {
             _logger.LogDebug("FtpSink: хост не задан, пропускаю");

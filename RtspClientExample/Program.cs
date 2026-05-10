@@ -29,7 +29,6 @@ namespace RtspClientExample
             services.AddTransient<IStorageSink, LocalFileSink>();
             services.AddTransient<IStorageSink, FtpSink>();
 
-
             services.AddLogging(builder =>
             {
                 builder

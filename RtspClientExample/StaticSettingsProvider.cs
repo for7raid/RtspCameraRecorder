@@ -1,5 +1,6 @@
 using CameraRecorder.Settings;
 using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
 
 namespace CameraRecorder;
 
@@ -10,17 +11,19 @@ public class StaticSettingsProvider : ISettingsProvider
 
     public StaticSettingsProvider()
     {
-        
+
         _config = new ConfigurationBuilder()
         .AddUserSecrets<StaticSettingsProvider>()
         .Build();
-        
+
         _settings = new CameraRecorderSettings
         {
             RtspUrl = "rtsp://192.168.1.8:554/stream1",
             RtspLogin = "admin",
             RtspPassword = "123456",
+            LocalStorageEnabled = true,
             LocalRecordingsPath = $@"c:\temp\camera\",
+            FtpEnabled = false,
             FtpHost = _config["FtpHost"],
             FtpLogin = _config["FtpLogin"],
             FtpPassword = _config["FtpPassword"],

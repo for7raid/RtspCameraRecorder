@@ -18,9 +18,19 @@ public class CameraRecorderSettings
     public string RtspPassword { get; init; } = string.Empty;
 
     /// <summary>
+    /// Локальное хранилище активно
+    /// </summary>
+    public bool LocalStorageEnabled { get; init; } = true;
+
+    /// <summary>
     /// Локальный путь для хранения записей
     /// </summary>
     public string LocalRecordingsPath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// FTP активно
+    /// </summary>
+    public bool FtpEnabled { get; init; }
 
     /// <summary>
     /// Хост FTP-сервера
@@ -45,7 +55,7 @@ public class CameraRecorderSettings
     /// <summary>
     /// Пусть на FTP сервере, куда загружать файлы
     /// </summary>
-    public string FtpDirectory { get; set; } 
+    public string FtpDirectory { get; set; }
 
     /// <summary>
     /// Длительность записи до начала движения (размер кольцевого буфера, секунд)

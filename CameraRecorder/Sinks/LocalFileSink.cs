@@ -18,6 +18,12 @@ public sealed class LocalFileSink : IStorageSink
 
     public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
     {
+        if (!_settings.LocalStorageEnabled)
+        {
+            _logger.LogDebug("LocalFileSink: локальное хранилище отключено, пропускаю");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_settings.LocalRecordingsPath))
         {
             _logger.LogDebug("LocalFileSink: путь не задан, пропускаю");

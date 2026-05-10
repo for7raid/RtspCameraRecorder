@@ -52,7 +52,10 @@ namespace CameraRecorder.App
             builder.Services.AddSingleton<MainPageModel>();
             builder.Services.AddSingleton<ProjectListPageModel>();
             builder.Services.AddSingleton<ManageMetaPageModel>();
+            builder.Services.AddSingleton<SettingsPageModel>();
+            builder.Services.AddSingleton<ISettingsStorageService, SettingsStorageService>();
 
+            builder.Services.AddTransientWithShellRoute<SettingsPage, SettingsPageModel>("settings");
             builder.Services.AddTransientWithShellRoute<ProjectDetailPage, ProjectDetailPageModel>("project");
             builder.Services.AddTransientWithShellRoute<TaskDetailPage, TaskDetailPageModel>("task");
 
