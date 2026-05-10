@@ -1,15 +1,17 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CameraRecorder.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace CameraRecorder;
 
 public class RtspRecorder
 {
     private readonly ILogger<RtspRecorder> _logger;
+    private readonly CameraRecorderSettings _settings;
     private readonly ILoggerFactory _loggerFactory;
     private readonly RTSPClient _client;
     private readonly RingBufferAudioStorage _bufferAudioStorage;
+    private readonly ISettingsProvider _settingsProvider;
     private readonly RingBufferVideoStorage _bufferVideoStorage;
-    private string _outputDirecroty;
     private const string ProfileH264 = "H264";
     private const string ProfileH265 = "H265";
     private const string ProfilePCMU = "PCMU";
@@ -19,16 +21,19 @@ public class RtspRecorder
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
     public RtspRecorder(ILoggerFactory loggerFactory,
         RTSPClient client,
+        RingBufferVideoStorage bufferVideoStorage,
         RingBufferAudioStorage bufferAudioStorage,
-        RingBufferVideoStorage bufferVideoStorage)
+        ISettingsProvider settingsProvider)
     {
         _loggerFactory = loggerFactory;
         _client = client;
         _bufferAudioStorage = bufferAudioStorage;
+        _settingsProvider = settingsProvider;
         _bufferVideoStorage = bufferVideoStorage;
         _logger = _loggerFactory.CreateLogger<RtspRecorder>();
+        _settings = _settingsProvider.GetSettings();
 
-        _motionAnalyzer = new(VideoCodec.H265, loggerFactory.CreateLogger<MotionAnalyzer>(), MotionSensitivity.SlowHand());
+        _motionAnalyzer = new(VideoCodec.H265, loggerFactory.CreateLogger<MotionAnalyzer>(), MotionSensitivity.SlowHand);
 
         client.SetupAudioPayload(ProfilePCMU, ReceiveAudioPCMx);
         client.SetupVideoPayload(ProfileH265, ReceivedVideoData_H265);
@@ -52,10 +57,10 @@ public class RtspRecorder
         _bufferAudioStorage.StartRecord();
     }
 
-    public void StopRecord()
+    public async Task StopRecordAsync()
     {
-        _bufferVideoStorage.StopRecord(_outputDirecroty);
-        _bufferAudioStorage.StopRecord(_outputDirecroty);
+        await _bufferVideoStorage.StopRecordAsync();
+        await _bufferAudioStorage.StopRecordAsync();
     }
     void ReceiveAudioPCMx(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
@@ -79,7 +84,7 @@ public class RtspRecorder
             }
         }
     }
-    void ReceivedVideoData_H265(RTSPClient client, SimpleDataEventArgs dataArgs)
+    async void ReceivedVideoData_H265(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
         foreach (var nalUnitMem in dataArgs.Data)
         {
@@ -95,9 +100,9 @@ public class RtspRecorder
                     _lastMotionTime = DateTime.Now;
                 }
 
-                if ((DateTime.Now - _lastMotionTime).TotalSeconds > 10)
+                if ((DateTime.Now - _lastMotionTime).TotalSeconds > _settings.PostMotionDurationSec)
                 {
-                    StopRecord();
+                    await StopRecordAsync();
                 }
 
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
@@ -105,9 +110,9 @@ public class RtspRecorder
         }
     }
 
-    public void Start(string url, string username, string password, string outputDirecroty)
+    public void Start()
     {
-        _outputDirecroty = outputDirecroty;
-        _client.Connect(url, username, password, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+        _client.Stop();
+        _client.Connect(_settings.RtspUrl, _settings.RtspLogin, _settings.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
     }
 }

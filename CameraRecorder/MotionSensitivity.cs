@@ -6,55 +6,55 @@ public class MotionSensitivity
     /// Минимальный размер P/B кадра для проверки на движение (байт)
     /// Меньшие кадры считаются статичными
     /// </summary>
-    public int MinFrameSizeForMotion { get; set; } = 80;
+    public int MinFrameSizeForMotion { get; init; } = 80;
 
     /// <summary>
     /// Процент ненулевых байт в payload, необходимый для детекции движения
     /// 0.01 = 1%, 0.1 = 10%, 1.0 = 100%
     /// </summary>
-    public double NonZeroBytesThreshold { get; set; } = 0.05; // 5%
+    public double NonZeroBytesThreshold { get; init; } = 0.05; // 5%
 
     /// <summary>
     /// Количество байт для выборки при проверке ненулевых байт
     /// </summary>
-    public int SampleSize { get; set; } = 100;
+    public int SampleSize { get; init; } = 100;
 
     /// <summary>
     /// Порог для остатка относительно среднего I-кадра
     /// 0.1 = 10%, 0.2 = 20% и т.д.
     /// </summary>
-    public double ResidualRatioThreshold { get; set; } = 0.2;
+    public double ResidualRatioThreshold { get; init; } = 0.2;
 
     /// <summary>
     /// Включить детекцию по остатку
     /// </summary>
-    public bool EnableResidualDetection { get; set; } = true;
+    public bool EnableResidualDetection { get; init; } = true;
 
     /// <summary>
     /// Включить детекцию по векторам
     /// </summary>
-    public bool EnableVectorDetection { get; set; } = true;
+    public bool EnableVectorDetection { get; init; } = true;
 
     /// <summary>
     /// Минимальная длина payload для анализа
     /// </summary>
-    public int MinPayloadLength { get; set; } = 10;
+    public int MinPayloadLength { get; init; } = 10;
 
     /// <summary>
     /// Уровень детализации вывода (0-минимум, 1-нормальный, 2-подробный)
     /// </summary>
-    public int VerboseLevel { get; set; } = 1;
+    public int VerboseLevel { get; init; } = 1;
 
     /// <summary>
     /// Порог движеня по количеству кадров с движением от общего количества кадров для анализа
     /// </summary>
-    public double MovieFramesRatioThreshold { get; set; }
+    public double MovieFramesRatioThreshold { get; init; }
     /// <summary>
     /// Предустановки чувствительности
     /// </summary>
-    
 
-    public static MotionSensitivity SlowHand() => new MotionSensitivity
+
+    public static MotionSensitivity SlowHand { get; } = new MotionSensitivity
     {
         // Базовые пороги для 2560x1440 @ 15 fps
         MinFrameSizeForMotion = 220,        // Минимальный размер P/B кадра (байт)

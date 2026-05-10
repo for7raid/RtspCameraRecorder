@@ -477,7 +477,7 @@ public class RTSPClient
             _logger.LogInformation("Not connected");
             return false;
         }
-        if (_ready) { return false; }
+        if (!_ready) { return false; }
 
         // Send TEARDOWN
         RtspRequest teardownMessage = new RtspRequestTeardown

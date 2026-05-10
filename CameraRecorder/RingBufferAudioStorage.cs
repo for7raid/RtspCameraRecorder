@@ -1,5 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CameraRecorder.Settings;
+using CameraRecorder.Sinks;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Runtime;
 using System.Text;
 
 namespace CameraRecorder;
@@ -8,14 +11,19 @@ public class RingBufferAudioStorage
 {
     private readonly ConcurrentQueue<AudioFrame> _buffer = new();
     private readonly object _lockObj = new();
-    private readonly int _maxDurationMs = 10 * 1000;
+    private readonly int _maxDurationMs;
     private readonly ILogger<RingBufferAudioStorage> _logger;
+    private readonly IStorageSink[] _sinks;
+    private readonly CameraRecorderSettings _settings;
     private long _currentBufferDurationMs = 0;
 
     private bool _isRecording;
-    public RingBufferAudioStorage(ILogger<RingBufferAudioStorage> logger)
+    public RingBufferAudioStorage(ILogger<RingBufferAudioStorage> logger, IEnumerable<IStorageSink> sinks, ISettingsProvider settingsProvider)
     {
         _logger = logger;
+        _sinks = sinks?.ToArray() ?? [];
+        _settings = settingsProvider.GetSettings();
+        _maxDurationMs = _settings.PreMotionDurationSec * 1000;
     }
 
     // Вызывается для каждого полученного кадра из SharpRTSP
@@ -52,8 +60,8 @@ public class RingBufferAudioStorage
         _logger.LogInformation($"Start audio recodring {DateTime.Now:yyyy-MM-dd HH:mm:ss}, firts frame {oldestFrame?.Timestamp::yyyy-MM-dd HH:mm:ss}, duration {_currentBufferDurationMs}, frames count {_buffer.Count}");
     }
 
-    // Сохраняет текущий буфер в MP4 файл
-    public void StopRecord(string outputDirectory)
+    // Строит WAV в MemoryStream и отправляет во все sinks
+    public async Task StopRecordAsync()
     {
         if (!_isRecording) return;
 
@@ -66,26 +74,40 @@ public class RingBufferAudioStorage
             _isRecording = false;
         }
 
-        if (framesToSave.Count > 0)
+        if (framesToSave.Count == 0) return;
+
+        var timestamp = framesToSave[0].Timestamp;
+        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss}.wav";
+
+        _logger.LogInformation(
+            "Запись аудио завершена {Time:HH:mm:ss}, первый кадр: {FirstFrame:HH:mm:ss.f}, длительность: {Duration}мс, кадров: {Count}",
+            DateTime.Now, timestamp, _currentBufferDurationMs, framesToSave.Count);
+
+        // Строим WAV в MemoryStream
+        using var wavStream = new MemoryStream();
+
+        int pcmDataSize = framesToSave.Sum(u => u.Data.Length) * 2;
+        var header = BuildWavHeader(pcmDataSize);
+        wavStream.Write(header);
+
+        foreach (var item in framesToSave)
         {
-            _logger.LogInformation($"Record audio finished {DateTime.Now:HH:mm:ss}, firts frame {framesToSave[0].Timestamp:HH:mm:ss.f}, duration {_currentBufferDurationMs}, frames count {framesToSave.Count}");
-
-            string fileName = Path.Combine(outputDirectory, $"{framesToSave[0].Timestamp:yyyy-MM-dd HH.mm.ss}.wav");
-
-            using var _outputStream = new FileStream(fileName, FileMode.Create, FileAccess.Write);
-
-            var header = BuildWavHeader(framesToSave.Sum(u => u.Data.Length) * 2);
-            _outputStream.Write(header);
-
-            foreach (var item in framesToSave)
-            {
-                var bytes = NAudio.Codecs.MuLawDecoder.DecodeMuLawToPcm(item.Data);
-                _outputStream.Write(bytes);
-            }
-
+            var bytes = NAudio.Codecs.MuLawDecoder.DecodeMuLawToPcm(item.Data);
+            wavStream.Write(bytes);
         }
 
-
+        // Раздаём всем sink-ам
+        foreach (var sink in _sinks)
+        {
+            try
+            {
+                await sink.SaveAsync(fileName, wavStream, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка сохранения аудио в {SinkName}", sink.Name);
+            }
+        }
     }
 
     public static byte[] BuildWavHeader(int dataSize, int sampleRate = 8000, short channels = 1, short bitsPerSample = 16)

@@ -37,7 +37,7 @@ public class MotionAnalyzer
         _codec = codec;
         _logger = logger;
         _isHevc = (codec == VideoCodec.H265);
-        _sensitivity = sensitivity ?? MotionSensitivity.SlowHand();
+        _sensitivity = sensitivity ?? MotionSensitivity.SlowHand;
         _nalUnits = new List<NalUnit>();
 
     }

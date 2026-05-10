@@ -1,4 +1,6 @@
 ﻿using CameraRecorder;
+using CameraRecorder.Settings;
+using CameraRecorder.Sinks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SharpMP4.Common;
@@ -22,6 +24,11 @@ namespace RtspClientExample
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
+            services.AddTransient<ISettingsProvider, StaticSettingsProvider>();
+
+            services.AddTransient<IStorageSink, LocalFileSink>();
+            services.AddTransient<IStorageSink, FtpSink>();
+
 
             services.AddLogging(builder =>
             {
@@ -52,7 +59,7 @@ namespace RtspClientExample
             string password = "123456";
 
 
-            recorder.Start(url, username, password, $@"c:\temp\camera\");
+            recorder.Start();
 
 
             Console.WriteLine("Press ENTER to exit");
@@ -79,7 +86,7 @@ namespace RtspClientExample
                 {
                     stopwatch.Stop();
                     logger.LogInformation($"Stop recording {stopwatch.Elapsed}");
-                    recorder.StopRecord();
+                    recorder.StopRecordAsync();
                 }
             }
 
