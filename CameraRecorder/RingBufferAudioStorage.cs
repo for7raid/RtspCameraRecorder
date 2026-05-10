@@ -2,7 +2,6 @@
 using CameraRecorder.Sinks;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Runtime;
 using System.Text;
 
 namespace CameraRecorder;
@@ -77,7 +76,7 @@ public class RingBufferAudioStorage
         if (framesToSave.Count == 0) return;
 
         var timestamp = framesToSave[0].Timestamp;
-        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss}.wav";
+        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss} {(int)(_currentBufferDurationMs / 1000)} sec.wav";
 
         _logger.LogInformation(
             "Запись аудио завершена {Time:HH:mm:ss}, первый кадр: {FirstFrame:HH:mm:ss.f}, длительность: {Duration}мс, кадров: {Count}",

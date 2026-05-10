@@ -85,7 +85,7 @@ public class RingBufferVideoStorage
         if (framesToSave.Count == 0) return;
 
         var timestamp = framesToSave[0].Timestamp;
-        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss}.mp4";
+        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss} {(int)(_currentBufferDurationMs/1000)} sec.mp4";
 
         _logger.LogInformation(
             "Запись завершена {Time:HH:mm:ss}, первый кадр: {FirstFrame:HH:mm:ss.f} ({UnitType}), длительность: {Duration}мс, кадров: {Count}",
