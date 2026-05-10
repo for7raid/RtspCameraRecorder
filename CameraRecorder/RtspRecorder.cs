@@ -10,10 +10,13 @@ public class RtspRecorder
     private readonly RingBufferAudioStorage _bufferAudioStorage;
     private readonly RingBufferVideoStorage _bufferVideoStorage;
     private string _outputDirecroty;
+    private const string ProfileH264 = "H264";
     private const string ProfileH265 = "H265";
+    private const string ProfilePCMU = "PCMU";
+    MotionAnalyzer _motionAnalyzer;
+    private DateTime _lastMotionTime;
 
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
-
     public RtspRecorder(ILoggerFactory loggerFactory,
         RTSPClient client,
         RingBufferAudioStorage bufferAudioStorage,
@@ -25,31 +28,11 @@ public class RtspRecorder
         _bufferVideoStorage = bufferVideoStorage;
         _logger = _loggerFactory.CreateLogger<RtspRecorder>();
 
-        _client.NewVideoStream += (_, args) =>
-        {
-            switch (args.StreamType)
-            {
-                case ProfileH265:
-                    NewH265Stream(args, client);
-                    break;
-                default:
-                    _logger.LogWarning("Unknow Video format {streamtype}", args.StreamType);
-                    break;
-            }
-        };
+        _motionAnalyzer = new(VideoCodec.H265, loggerFactory.CreateLogger<MotionAnalyzer>(), MotionSensitivity.SlowHand());
 
-        _client.NewAudioStream += (_, arg) =>
-        {
-            switch (arg.StreamType)
-            {
-                case "PCMU":
-                    NewGenericAudio(client, "ul", "PCMU");
-                    break;
-                default:
-                    _logger.LogWarning("Unknow Audio format {streamtype}", arg.StreamType);
-                    break;
-            }
-        };
+        client.SetupAudioPayload(ProfilePCMU, ReceiveAudioPCMx);
+        client.SetupVideoPayload(ProfileH265, ReceivedVideoData_H265);
+        client.SetupVideoPayload(ProfileH264, ReceivedVideoData_H264);
 
         _client.SetupMessageCompleted += (_, _) =>
         {
@@ -67,7 +50,6 @@ public class RtspRecorder
     {
         _bufferVideoStorage.StartRecord();
         _bufferAudioStorage.StartRecord();
-    
     }
 
     public void StopRecord()
@@ -75,55 +57,54 @@ public class RtspRecorder
         _bufferVideoStorage.StopRecord(_outputDirecroty);
         _bufferAudioStorage.StopRecord(_outputDirecroty);
     }
-
-
-    private void NewGenericAudio(RTSPClient client, string extension, string stringType)
+    void ReceiveAudioPCMx(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
-
-        void ReceiveAudioPCMx(RTSPClient client, SimpleDataEventArgs dataArgs)
+        foreach (var data in dataArgs.Data)
         {
-            foreach (var data in dataArgs.Data)
+            _bufferAudioStorage?.AddFrame(data);
+        }
+    }
+    void ReceivedVideoData_H264(RTSPClient client, SimpleDataEventArgs dataArgs)
+    {
+        foreach (var nalUnitMem in dataArgs.Data)
+        {
+            var nalUnit = nalUnitMem.Span;
+            if (nalUnit.Length > 5)
             {
-                _bufferAudioStorage?.AddFrame(data);
+                var nal_unit_type = (NalUnitType)(nalUnit[4] & 0x1F);
+                var unit = nalUnitMem.Slice(5);
+                _bufferVideoStorage.AddFrame(unit, nal_unit_type);
+                //_motionAnalyzer.Append(unit.ToArray());
+                _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
             }
         }
-        client.SetupAudioPayload(stringType, ReceiveAudioPCMx);
     }
-
-
-    private void NewH265Stream(NewStreamEventArgs args, RTSPClient client)
+    void ReceivedVideoData_H265(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
-        void ReceivedVideoData_H265(RTSPClient client, SimpleDataEventArgs dataArgs)
+        foreach (var nalUnitMem in dataArgs.Data)
         {
-
-            foreach (var nalUnitMem in dataArgs.Data)
+            var nalUnit = nalUnitMem.Span;
+            if (nalUnit.Length > 5)
             {
-                var nalUnit = nalUnitMem.Span;
-                // Output some H264 stream information
-                if (nalUnit.Length > 5)
+                var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
+                var unit = nalUnitMem.Slice(4);
+                _bufferVideoStorage.AddFrame(unit, nal_unit_type);
+                if (_motionAnalyzer.Append(unit.ToArray()))
                 {
-                    var nal_unit_type = (nalUnit[4] >> 1) & 0x3F;
-                    string description = nal_unit_type switch
-                    {
-                        1 => "NON IDR NAL",
-                        19 => "IDR NAL",
-                        32 => "VPS NAL",
-                        33 => "SPS NAL",
-                        34 => "PPS NAL",
-                        39 => "SEI NAL",
-                        _ => "OTHER NAL",
-                    };
-                    _logger.LogDebug("NAL Type = {nal_unit_type} {description}", nal_unit_type, description);
-
-                    _bufferVideoStorage.AddFrame(nalUnitMem.Slice(4), nal_unit_type);
+                    StartRecord();
+                    _lastMotionTime = DateTime.Now;
                 }
 
+                if ((DateTime.Now - _lastMotionTime).TotalSeconds > 10)
+                {
+                    StopRecord();
+                }
 
+                _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
             }
         }
-        ;
-        client.SetupVideoPayload(ProfileH265, ReceivedVideoData_H265);
     }
+
     public void Start(string url, string username, string password, string outputDirecroty)
     {
         _outputDirecroty = outputDirecroty;

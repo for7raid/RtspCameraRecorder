@@ -26,7 +26,7 @@ public class RingBufferVideoStorage
     }
 
     // Вызывается для каждого полученного кадра из SharpRTSP
-    public void AddFrame(ReadOnlyMemory<byte> nalUnit, int unitType)
+    public void AddFrame(ReadOnlyMemory<byte> nalUnit, NalUnitType unitType)
     {
         var timestamp = DateTime.Now;
 
@@ -44,7 +44,7 @@ public class RingBufferVideoStorage
 
                     //Удаляем кадры, которые старее 10 секунд или кадры из середины
                     VideoFrame f;
-                    while (_currentBufferDurationMs > _maxDurationMs && _buffer.TryDequeue(out f) || _buffer.TryPeek(out f) && f.UnitType != 32 && _buffer.TryDequeue(out f))
+                    while (_currentBufferDurationMs > _maxDurationMs && _buffer.TryDequeue(out f) || _buffer.TryPeek(out f) && f.UnitType != NalUnitType.H265_VPS && _buffer.TryDequeue(out f))
                     {
                         _currentBufferDurationMs = (long)(timestamp - f.Timestamp).TotalMilliseconds;
                     }

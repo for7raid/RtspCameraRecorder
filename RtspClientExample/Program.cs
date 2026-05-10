@@ -15,8 +15,8 @@ namespace RtspClientExample
         {
 
             var services = new ServiceCollection();
-            
-           
+
+
             services.AddTransient<RingBufferVideoStorage>();
             services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
@@ -30,10 +30,12 @@ namespace RtspClientExample
                     .AddFilter("System", LogLevel.Warning)
                     .AddFilter("RtspClientExample", LogLevel.Debug)
                     .AddFilter("Rtsp", LogLevel.Debug)
+                    .AddFilter("CameraRecorder.MotionAnalyzer_", LogLevel.Debug)
                     .AddSimpleConsole(o =>
                     {
-                        o.SingleLine = true;
-                    });
+                        o.SingleLine = false;
+                    })
+                    .AddFile($@"C:\temp\camera\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt");
             });
 
             // Строим провайдер
@@ -44,7 +46,7 @@ namespace RtspClientExample
             logger = serviceProvider.GetRequiredService<ILogger<Recorder>>();
 
 
-             string url = "rtsp://192.168.1.8:554/stream1";
+            string url = "rtsp://192.168.1.8:554/stream1";
 
             string username = "admin";
             string password = "123456";
