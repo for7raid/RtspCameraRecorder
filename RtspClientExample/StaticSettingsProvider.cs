@@ -14,10 +14,11 @@ public class StaticSettingsProvider : ISettingsProvider
             RtspLogin = "admin",
             RtspPassword = "123456",
             LocalRecordingsPath = $@"c:\temp\camera\",
-            FtpHost = "ftp.example.com",
-            FtpLogin = "ftpuser",
-            FtpPassword = "ftppass",
-            UseFtps = true
+            FtpHost = "",
+            FtpLogin = "",
+            FtpPassword = "",
+            FtpDirectory = "/rec",
+            UseFtps = false
         };
     }
 

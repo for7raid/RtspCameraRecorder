@@ -43,6 +43,11 @@ public class CameraRecorderSettings
     public bool UseFtps { get; init; }
 
     /// <summary>
+    /// Пусть на FTP сервере, куда загружать файлы
+    /// </summary>
+    public string FtpDirectory { get; set; } 
+
+    /// <summary>
     /// Длительность записи до начала движения (размер кольцевого буфера, секунд)
     /// </summary>
     public int PreMotionDurationSec { get; init; } = 10;
