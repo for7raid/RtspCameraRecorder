@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="AndroidApp1/AndroidApp1.csproj" Id="a2dd90c6-0e97-4093-96c5-dcc83a63e344">
+    <Deploy />
+  </Project>
+  <Project Path="CameraRecorder/CameraRecorder.csproj" />
+  <Project Path="RtspClientExample/RtspClientExample.csproj" />
+</Solution>
