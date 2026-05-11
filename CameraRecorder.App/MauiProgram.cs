@@ -55,10 +55,6 @@ namespace CameraRecorder.App
             builder.Services.AddTransient<IStorageSink, LocalFileSink>();
             builder.Services.AddTransient<IStorageSink, FtpSink>();
 
-            //builder.Configuration
-            //        .AddJsonFile("appsettings.json", optional: false);
-
-
             builder.Services.AddLogging(builder =>
             {
                 builder
@@ -80,6 +76,7 @@ namespace CameraRecorder.App
             builder.Services.AddSingleton<MainPageModel>();
             builder.Services.AddSingleton<ProjectListPageModel>();
             builder.Services.AddSingleton<ManageMetaPageModel>();
+            builder.Services.AddSingleton<LogFilesPageModel>();
             builder.Services.AddSingleton<SettingsPageModel>();
 
             // Настройки: один инстанс — и для провайдера, и для хранилища

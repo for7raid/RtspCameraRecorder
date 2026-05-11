@@ -27,6 +27,12 @@
         Route="manage" />
 
     <ShellContent
+        Title="Логи"
+        Icon="{StaticResource IconLogs}"
+        ContentTemplate="{DataTemplate pages:LogFilesPage}"
+        Route="logs" />
+
+    <ShellContent
         Title="Настройки"
         Icon="{StaticResource IconSettings}"
         ContentTemplate="{DataTemplate pages:SettingsPage}"
