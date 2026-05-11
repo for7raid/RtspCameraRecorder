@@ -1,4 +1,3 @@
-global using CameraRecorder.App.Data;
 global using CameraRecorder.App.PageModels;
 global using CameraRecorder.App.Pages;
 global using CameraRecorder.App.Services;

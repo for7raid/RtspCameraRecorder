@@ -23,14 +23,6 @@ namespace CameraRecorder.App
     				{
     					handler.PlatformView.SingleSelectionFollowsFocus = false;
     				});
-
-    				Microsoft.Maui.Handlers.ContentViewHandler.Mapper.AppendToMapping(nameof(Pages.Controls.CategoryChart), (handler, view) =>
-    				{
-    					if (view is Pages.Controls.CategoryChart && handler.PlatformView is Microsoft.Maui.Platform.ContentPanel contentPanel)
-    					{
-    						contentPanel.IsTabStop = true;
-    					}
-    				});
 #endif
                 })
                 .ConfigureFonts(fonts =>
@@ -67,15 +59,9 @@ namespace CameraRecorder.App
             });
 
 
-            builder.Services.AddSingleton<ProjectRepository>();
-            builder.Services.AddSingleton<TaskRepository>();
-            builder.Services.AddSingleton<CategoryRepository>();
-            builder.Services.AddSingleton<TagRepository>();
-            builder.Services.AddSingleton<SeedDataService>();
+
             builder.Services.AddSingleton<ModalErrorHandler>();
             builder.Services.AddSingleton<MainPageModel>();
-            builder.Services.AddSingleton<ProjectListPageModel>();
-            builder.Services.AddSingleton<ManageMetaPageModel>();
             builder.Services.AddSingleton<RecordingsPageModel>();
             builder.Services.AddSingleton<LogFilesPageModel>();
             builder.Services.AddSingleton<SettingsPageModel>();
@@ -84,9 +70,6 @@ namespace CameraRecorder.App
             builder.Services.AddSingleton<SettingsStorageService>();
             builder.Services.AddSingleton<ISettingsProvider>(sp => sp.GetRequiredService<SettingsStorageService>());
             builder.Services.AddSingleton<ISettingsStorageService>(sp => sp.GetRequiredService<SettingsStorageService>());
-
-            builder.Services.AddTransientWithShellRoute<ProjectDetailPage, ProjectDetailPageModel>("project");
-            builder.Services.AddTransientWithShellRoute<TaskDetailPage, TaskDetailPageModel>("task");
 
             return builder.Build();
         }
