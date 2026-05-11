@@ -55,6 +55,10 @@ namespace CameraRecorder.App
             builder.Services.AddTransient<IStorageSink, LocalFileSink>();
             builder.Services.AddTransient<IStorageSink, FtpSink>();
 
+            //builder.Configuration
+            //        .AddJsonFile("appsettings.json", optional: false);
+
+
             builder.Services.AddLogging(builder =>
             {
                 builder
@@ -63,8 +67,9 @@ namespace CameraRecorder.App
                     .AddFilter("RtspClientExample", LogLevel.Debug)
                     .AddFilter("Rtsp", LogLevel.Debug)
                     .AddFilter("CameraRecorder.MotionAnalyzer_", LogLevel.Debug)
-                    .AddFile($@"C:\temp\camera\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt");
+                    .AddFile(Path.Combine(FileSystem.AppDataDirectory, "logs", $"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"));
             });
+
 
             builder.Services.AddSingleton<ProjectRepository>();
             builder.Services.AddSingleton<TaskRepository>();

@@ -66,4 +66,13 @@ public class CameraRecorderSettings
     /// Длительность записи после окончания движения (секунд)
     /// </summary>
     public int PostMotionDurationSec { get; init; } = 10;
+
+    public static CameraRecorderSettings Default { get; } = new CameraRecorderSettings()
+    {
+        RtspUrl = " rtsp://192.168.1.8:554/stream1",
+        RtspLogin = "admin",
+        RtspPassword = "123456",
+        LocalStorageEnabled = true,
+        LocalRecordingsPath = "DCIM/camera",
+    };
 }

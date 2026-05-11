@@ -42,7 +42,7 @@ public class SettingsStorageService : ISettingsProvider, ISettingsStorageService
     private static CameraRecorderSettings LoadFromFile()
     {
         if (!File.Exists(FilePath))
-            return new CameraRecorderSettings();
+            return CameraRecorderSettings.Default;
 
         try
         {
@@ -52,7 +52,7 @@ public class SettingsStorageService : ISettingsProvider, ISettingsStorageService
         }
         catch (JsonException)
         {
-            return new CameraRecorderSettings();
+            return CameraRecorderSettings.Default;
         }
     }
 }

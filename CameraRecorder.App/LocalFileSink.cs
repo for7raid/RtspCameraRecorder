@@ -3,21 +3,22 @@ using Microsoft.Extensions.Logging;
 
 namespace CameraRecorder.Sinks;
 
-public sealed class LocalFileSink_ : IStorageSink
+public sealed class LocalFileSink : IStorageSink
 {
-    private readonly CameraRecorderSettings _settings;
-    private readonly ILogger<LocalFileSink_> _logger;
+    private readonly ISettingsProvider _settingsProvider;
+    private readonly ILogger<LocalFileSink> _logger;
 
     public string Name => "LocalFile";
 
-    public LocalFileSink_(ISettingsProvider settingsProvider, ILogger<LocalFileSink_> logger)
+    public LocalFileSink(ISettingsProvider settingsProvider, ILogger<LocalFileSink> logger)
     {
-        _settings = settingsProvider.GetSettings();
+        _settingsProvider = settingsProvider;
         _logger = logger;
     }
 
     public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
     {
+        var _settings = _settingsProvider.GetSettings();
         if (!_settings.LocalStorageEnabled)
         {
             _logger.LogDebug("LocalFileSink: локальное хранилище отключено, пропускаю");
@@ -44,17 +45,18 @@ var context = Platform.CurrentActivity;
         contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, _settings.LocalRecordingsPath);
         Android.Net.Uri imageUri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, contentValues);
            
-        var os = resolver.OpenOutputStream(imageUri);
+        using var os = resolver.OpenOutputStream(imageUri);
         await stream.CopyToAsync(os);
-        os.Flush();
-        os.Close();
-        _logger.LogInformation("Файл сохранён локально: {Path}", imageUri);
+        _logger.LogInformation("Файл сохранён локально: {Path} {fileName}", imageUri, fileName);
     }
     else
     {
-        Java.IO.File storagePath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryPictures);
-        string path = System.IO.Path.Combine(storagePath.ToString(), "image.png");
-       
+        Java.IO.File storagePath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryMovies);
+        string path = System.IO.Path.Combine(storagePath.ToString(), fileName);
+         using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None,
+            bufferSize: 81920, useAsync: true);
+        await stream.CopyToAsync(fs, ct);
+        _logger.LogInformation("Файл сохранён локально: {Path}", path);
     }
 
 #endif

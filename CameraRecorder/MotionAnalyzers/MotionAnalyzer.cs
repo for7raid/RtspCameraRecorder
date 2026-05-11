@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace CameraRecorder;
+namespace CameraRecorder.MotionAnalyzers;
 
 public class NalUnit
 {
@@ -21,6 +21,7 @@ public class NalUnit
     public double NonZeroBytesRatio { get; set; } = 0;
     public bool HasMotionByVector { get; set; }
     public bool HasMotionByResidual { get; set; }
+    public bool HasMotionByVarianceFilter { get; internal set; }
 }
 
 public class MotionAnalyzer
@@ -29,6 +30,7 @@ public class MotionAnalyzer
     private readonly ILogger<MotionAnalyzer> _logger;
     private readonly List<NalUnit> _nalUnits;
     private readonly MotionSensitivity _sensitivity;
+    private readonly MotionDetectorWithVariance _varianceDetector = new(20);
     private long _averageISliceSize = 0;
     private bool _isHevc;
 
@@ -39,6 +41,7 @@ public class MotionAnalyzer
         _isHevc = (codec == VideoCodec.H265);
         _sensitivity = sensitivity ?? MotionSensitivity.SlowHand;
         _nalUnits = new List<NalUnit>();
+
 
     }
 
@@ -261,7 +264,9 @@ public class MotionAnalyzer
 
         int motionByVectorCount = 0;
         int motionByResidualCount = 0;
+        int totalMotion = 0;
         int frameNumber = 0;
+
 
         foreach (var unit in _nalUnits)
         {
@@ -280,6 +285,10 @@ public class MotionAnalyzer
             unit.HasMotionByVector = HasMotionVectors(unit);
             unit.HasMotionByResidual = HasHighResidual(unit);
 
+            unit.HasMotionByVarianceFilter = _sensitivity.EnableByVarianceDetection && _varianceDetector.IsMotionByVariance(unit.PayloadSize);
+
+            if (unit.HasMotionByVector || unit.HasMotionByResidual || unit.HasMotionByVarianceFilter) totalMotion++;
+
             if (unit.HasMotionByVector)
             {
                 motionByVectorCount++;
@@ -293,6 +302,13 @@ public class MotionAnalyzer
                     PrintMotionResult(frameNumber, unit, "ДВИЖЕНИЕ ПО ОСТАТКУ");
             }
 
+            if (unit.HasMotionByVarianceFilter)
+            {
+                motionByResidualCount++;
+                if (_sensitivity.VerboseLevel >= 1)
+                    PrintMotionResult(frameNumber, unit, "ДВИЖЕНИЕ ПО ОТКЛОНЕНИЮ");
+            }
+
             if (_sensitivity.VerboseLevel >= 2 && isPB)
             {
                 _logger.LogDebug("Кадр #{FrameNum}: НЕТ движения (размер={PayloadSize}, nonZeroRatio={NonZeroRatio:F3})", frameNumber, unit.PayloadSize, unit.NonZeroBytesRatio);
@@ -301,12 +317,14 @@ public class MotionAnalyzer
             frameNumber++;
         }
 
+
+
         _logger.LogInformation("===== ИТОГО =====");
         _logger.LogInformation("Кадров с движением (по векторам): {Count}", motionByVectorCount);
         _logger.LogInformation("Кадров с движением (только по остатку): {Count}", motionByResidualCount);
         _logger.LogInformation("Всего P/B кадров: {Count}", frameNumber);
 
-        int totalMotion = motionByVectorCount + motionByResidualCount;
+
         var ratio = (double)totalMotion / frameNumber;
         if (totalMotion == 0)
             _logger.LogInformation("Движение не обнаружено");

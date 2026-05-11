@@ -33,7 +33,7 @@
     </ContentPage.Resources>
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem IsEnabled="False" Text="{Binding RecordDuration, StringFormat='{0:hh\\:mm\\:ss}'}"/>
+        <ToolbarItem IsEnabled="False" Text="{Binding RecordDurationText}"/>
         <ToolbarItem Text="Начать запись"
                      Command="{Binding StartRecordCommand}"
                      IconImageSource="{StaticResource IconRecordStart}" 

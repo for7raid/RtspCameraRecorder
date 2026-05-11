@@ -1,4 +1,4 @@
-﻿namespace CameraRecorder;
+﻿namespace CameraRecorder.MotionAnalyzers;
 
 public class MotionSensitivity
 {
@@ -36,6 +36,11 @@ public class MotionSensitivity
     public bool EnableVectorDetection { get; init; } = true;
 
     /// <summary>
+    /// Включить детекцию по отклоениню от размера
+    /// </summary>
+    public bool EnableByVarianceDetection { get; init; } = true;
+
+    /// <summary>
     /// Минимальная длина payload для анализа
     /// </summary>
     public int MinPayloadLength { get; init; } = 10;
@@ -57,11 +62,11 @@ public class MotionSensitivity
     public static MotionSensitivity SlowHand { get; } = new MotionSensitivity
     {
         // Базовые пороги для 2560x1440 @ 15 fps
-        MinFrameSizeForMotion = 220,        // Минимальный размер P/B кадра (байт)
+        MinFrameSizeForMotion = 300,        // Минимальный размер P/B кадра (байт)
                                             // Медленный жест даёт ~250-400 байт
                                             // Статика даёт ~180-220 байт
 
-        NonZeroBytesThreshold = 0.72,       // 72% ненулевых байт в payload
+        NonZeroBytesThreshold = 0.99,       // 72% ненулевых байт в payload
                                             // Медленный жест: 0.72-0.80
                                             // Статика: 0.65-0.71
 
@@ -72,6 +77,7 @@ public class MotionSensitivity
 
         EnableVectorDetection = true,
         EnableResidualDetection = true,     // Для плавных движений остаток важен
+        EnableByVarianceDetection = true,
 
         MinPayloadLength = 20,
         VerboseLevel = 1,

@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace CameraRecorder.App.PageModels
@@ -15,10 +15,13 @@ namespace CameraRecorder.App.PageModels
 
         [ObservableProperty]
         TimeSpan _recordDuration;
-        
+
+        [ObservableProperty]
+        string _recordDurationText;
+
         [ObservableProperty]
         private string _today = DateTime.Now.ToString("dddd, MMM d");
-        
+
         public MainPageModel(
             RtspRecorder rtspRecorder)
         {
@@ -28,7 +31,11 @@ namespace CameraRecorder.App.PageModels
 
             _rtspRecorder.RecordingStarted += () => IsRecording = true;
             _rtspRecorder.RecordingStopped += () => IsRecording = false;
-            _rtspRecorder.RecordingDurationChanged += (duration) => RecordDuration = duration;
+            _rtspRecorder.RecordingDurationChanged += (duration) =>
+            {
+                RecordDuration = duration;
+                RecordDurationText = duration != TimeSpan.Zero ? ((int)duration.TotalSeconds % 2 == 0 ? "🔴" : "⚫") + duration.ToString("hh\\:mm\\:ss") : string.Empty;
+            };
 
             _rtspRecorder.Start();
         }

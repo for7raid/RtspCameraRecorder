@@ -1,4 +1,5 @@
-﻿using CameraRecorder.Settings;
+﻿using CameraRecorder.MotionAnalyzers;
+using CameraRecorder.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace CameraRecorder;
@@ -18,9 +19,6 @@ public class RtspRecorder
     MotionAnalyzer _motionAnalyzer;
     private DateTime? _lastMotionTime;
     private bool _isRecording;
-
-    private CancellationTokenSource? _durationCts;
-    private Task? _durationLoop;
 
     /// <summary>
     /// Событие: запись началась (при переходе из состояния ожидания)
@@ -73,7 +71,6 @@ public class RtspRecorder
 
     public void Stop()
     {
-        StopDurationLoop();
         _client.Stop();
     }
 
@@ -87,13 +84,11 @@ public class RtspRecorder
             _isRecording = true;
             _logger.LogInformation("Запись началась");
             RecordingStarted?.Invoke();
-            StartDurationLoop();
         }
     }
 
     public async Task StopRecordAsync()
     {
-        StopDurationLoop();
 
         await _bufferVideoStorage.StopRecordAsync();
         await _bufferAudioStorage.StopRecordAsync();
@@ -128,6 +123,8 @@ public class RtspRecorder
             }
         }
     }
+
+    TimeSpan lastDuration = TimeSpan.Zero;
     async void ReceivedVideoData_H265(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
         foreach (var nalUnitMem in dataArgs.Data)
@@ -142,14 +139,24 @@ public class RtspRecorder
                 //TODO Запускаем запись по движению, если сейчас нет записи вручную
                 if (_motionAnalyzer.Append(unit.ToArray()))
                 {
-                    StartRecord();
-                    _lastMotionTime = DateTime.Now;
+                    //StartRecord();
+                    //_lastMotionTime = DateTime.Now;
                 }
 
                 if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _settings.PostMotionDurationSec)
                 {
                     await StopRecordAsync();
                     _lastMotionTime = null;
+                }
+
+                if (_isRecording)
+                {
+                    var current = RecordingDuration;
+                    if ((int)current.TotalSeconds != (int)lastDuration.TotalSeconds)
+                    {
+                        lastDuration = current;
+                        RecordingDurationChanged?.Invoke(current);
+                    }
                 }
 
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
@@ -160,51 +167,10 @@ public class RtspRecorder
     public void Start()
     {
         _client.Stop();
-        _client.Connect(_settings.RtspUrl, _settings.RtspLogin, _settings.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
-    }
-
-    // ── private: фоновый опрос длительности записи ──
-
-    private void StartDurationLoop()
-    {
-        StopDurationLoop();
-
-        _durationCts = new CancellationTokenSource();
-        var ct = _durationCts.Token;
-
-        _durationLoop = Task.Run(async () =>
+        if (!string.IsNullOrWhiteSpace(_settings.RtspUrl))
         {
-            var lastDuration = TimeSpan.Zero;
-
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    await Task.Delay(1000, ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-
-                var current = RecordingDuration;
-                if (current != lastDuration)
-                {
-                    lastDuration = current;
-                    RecordingDurationChanged?.Invoke(current);
-                }
-            }
-        }, ct);
-    }
-
-    private void StopDurationLoop()
-    {
-        if (_durationCts is not null)
-        {
-            _durationCts.Cancel();
-            _durationCts.Dispose();
-            _durationCts = null;
-            _durationLoop = null;
+            _client.Connect(_settings.RtspUrl, _settings.RtspLogin, _settings.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
         }
     }
 }
+
