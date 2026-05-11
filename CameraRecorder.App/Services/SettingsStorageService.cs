@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace CameraRecorder.App.Services;
 
-public class SettingsStorageService : ISettingsStorageService
+public class SettingsStorageService : ISettingsProvider, ISettingsStorageService
 {
     private static readonly string FilePath =
         Path.Combine(FileSystem.AppDataDirectory, "camerarecorder.settings.json");
@@ -14,14 +14,39 @@ public class SettingsStorageService : ISettingsStorageService
         PropertyNameCaseInsensitive = true
     };
 
-    public async Task<CameraRecorderSettings> LoadAsync()
+    private CameraRecorderSettings _cached;
+
+    public SettingsStorageService()
+    {
+        _cached = LoadFromFile();
+    }
+
+    // ── ISettingsProvider ──
+    public CameraRecorderSettings GetSettings() => _cached;
+
+    // ── ISettingsStorageService ──
+    public Task<CameraRecorderSettings> LoadAsync()
+    {
+        _cached = LoadFromFile();
+        return Task.FromResult(_cached);
+    }
+
+    public async Task SaveAsync(CameraRecorderSettings settings)
+    {
+        _cached = settings;
+        var json = JsonSerializer.Serialize(settings, JsonOptions);
+        await File.WriteAllTextAsync(FilePath, json);
+    }
+
+    // ── private ──
+    private static CameraRecorderSettings LoadFromFile()
     {
         if (!File.Exists(FilePath))
             return new CameraRecorderSettings();
 
         try
         {
-            var json = await File.ReadAllTextAsync(FilePath);
+            var json = File.ReadAllText(FilePath);
             return JsonSerializer.Deserialize<CameraRecorderSettings>(json, JsonOptions)
                    ?? new CameraRecorderSettings();
         }
@@ -29,11 +54,5 @@ public class SettingsStorageService : ISettingsStorageService
         {
             return new CameraRecorderSettings();
         }
-    }
-
-    public async Task SaveAsync(CameraRecorderSettings settings)
-    {
-        var json = JsonSerializer.Serialize(settings, JsonOptions);
-        await File.WriteAllTextAsync(FilePath, json);
     }
 }

@@ -6,7 +6,6 @@ using SharpMP4.Builders;
 using SharpMP4.Common;
 using SharpMP4.Tracks;
 using System.Collections.Concurrent;
-using System.Runtime;
 
 namespace CameraRecorder;
 
@@ -22,6 +21,11 @@ public class RingBufferVideoStorage
     private long _currentBufferDurationMs = 0;
 
     private bool _isRecording;
+
+    /// <summary>
+    /// Текущая длительность кольцевого буфера
+    /// </summary>
+    public TimeSpan CurrentBufferDuration => TimeSpan.FromMilliseconds(_currentBufferDurationMs);
 
 
     public RingBufferVideoStorage(ILogger<RingBufferVideoStorage> logger, IMp4Logger mp4Logger, IEnumerable<IStorageSink> sinks, ISettingsProvider settingsProvider)
@@ -41,15 +45,16 @@ public class RingBufferVideoStorage
         var frame = new VideoFrame { Data = nalUnit.ToArray(), Timestamp = timestamp, UnitType = unitType };
         _buffer.Enqueue(frame);
 
-        if (!_isRecording)
-        {
-            lock (_lockObj)
-            {
-                // Обновляем суммарную длительность буфера
-                if (_buffer.TryPeek(out var oldestFrame))
-                {
-                    _currentBufferDurationMs = (long)(timestamp - oldestFrame.Timestamp).TotalMilliseconds;
 
+        lock (_lockObj)
+        {
+            // Обновляем суммарную длительность буфера
+            if (_buffer.TryPeek(out var oldestFrame))
+            {
+                _currentBufferDurationMs = (long)(timestamp - oldestFrame.Timestamp).TotalMilliseconds;
+
+                if (!_isRecording)
+                {
                     //Удаляем кадры, которые старее 10 секунд или кадры из середины
                     VideoFrame f;
                     while (_currentBufferDurationMs > _maxDurationMs && _buffer.TryDequeue(out f) || _buffer.TryPeek(out f) && f.UnitType != NalUnitType.H265_VPS && _buffer.TryDequeue(out f))
@@ -58,6 +63,7 @@ public class RingBufferVideoStorage
                     }
                 }
             }
+
         }
     }
 
@@ -85,7 +91,7 @@ public class RingBufferVideoStorage
         if (framesToSave.Count == 0) return;
 
         var timestamp = framesToSave[0].Timestamp;
-        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss} {(int)(_currentBufferDurationMs/1000)} sec.mp4";
+        string fileName = $"{timestamp:yyyy-MM-dd HH.mm.ss} {(int)(_currentBufferDurationMs / 1000)} sec.mp4";
 
         _logger.LogInformation(
             "Запись завершена {Time:HH:mm:ss}, первый кадр: {FirstFrame:HH:mm:ss.f} ({UnitType}), длительность: {Duration}мс, кадров: {Count}",

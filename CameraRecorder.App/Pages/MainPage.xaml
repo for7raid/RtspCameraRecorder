@@ -32,7 +32,20 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
+    <ContentPage.ToolbarItems>
+        <ToolbarItem IsEnabled="False" Text="{Binding RecordDuration, StringFormat='{0:hh\\:mm\\:ss}'}"/>
+        <ToolbarItem Text="Начать запись"
+                     Command="{Binding StartRecordCommand}"
+                     IconImageSource="{StaticResource IconRecordStart}" 
+                     IsEnabled="{Binding IsRecording, Converter={StaticResource Key=InvertedBoolConverter}}"/>
+        <ToolbarItem Text="Остановить запись" 
+                     Command="{Binding StopRecordCommand}" 
+                     IconImageSource="{StaticResource IconRecordStop}"
+                     IsEnabled="{Binding IsRecording}"/>
+    </ContentPage.ToolbarItems>
+
     <Grid>
+        
         <pullToRefresh:SfPullToRefresh
             IsRefreshing="{Binding IsRefreshing}"
             RefreshCommand="{Binding RefreshCommand}">

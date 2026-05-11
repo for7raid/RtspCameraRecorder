@@ -1,5 +1,8 @@
-﻿using CommunityToolkit.Maui;
+﻿using CameraRecorder.Settings;
+using CameraRecorder.Sinks;
+using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
+using SharpMP4.Common;
 using Syncfusion.Maui.Toolkit.Hosting;
 
 namespace CameraRecorder.App
@@ -39,9 +42,29 @@ namespace CameraRecorder.App
                 });
 
 #if DEBUG
-    		builder.Logging.AddDebug();
-    		builder.Services.AddLogging(configure => configure.AddDebug());
+            builder.Logging.AddDebug();
+            builder.Services.AddLogging(configure => configure.AddDebug());
 #endif
+
+            builder.Services.AddTransient<RingBufferVideoStorage>();
+            builder.Services.AddTransient<RingBufferAudioStorage>();
+            builder.Services.AddTransient<RTSPClient>();
+            builder.Services.AddTransient<RtspRecorder>();
+            builder.Services.AddTransient<IMp4Logger, Mp4Logger>();
+
+            builder.Services.AddTransient<IStorageSink, LocalFileSink>();
+            builder.Services.AddTransient<IStorageSink, FtpSink>();
+
+            builder.Services.AddLogging(builder =>
+            {
+                builder
+                    .AddFilter("Microsoft", LogLevel.Warning)
+                    .AddFilter("System", LogLevel.Warning)
+                    .AddFilter("RtspClientExample", LogLevel.Debug)
+                    .AddFilter("Rtsp", LogLevel.Debug)
+                    .AddFilter("CameraRecorder.MotionAnalyzer_", LogLevel.Debug)
+                    .AddFile($@"C:\temp\camera\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt");
+            });
 
             builder.Services.AddSingleton<ProjectRepository>();
             builder.Services.AddSingleton<TaskRepository>();
@@ -53,9 +76,12 @@ namespace CameraRecorder.App
             builder.Services.AddSingleton<ProjectListPageModel>();
             builder.Services.AddSingleton<ManageMetaPageModel>();
             builder.Services.AddSingleton<SettingsPageModel>();
-            builder.Services.AddSingleton<ISettingsStorageService, SettingsStorageService>();
 
-            builder.Services.AddTransientWithShellRoute<SettingsPage, SettingsPageModel>("settings");
+            // Настройки: один инстанс — и для провайдера, и для хранилища
+            builder.Services.AddSingleton<SettingsStorageService>();
+            builder.Services.AddSingleton<ISettingsProvider>(sp => sp.GetRequiredService<SettingsStorageService>());
+            builder.Services.AddSingleton<ISettingsStorageService>(sp => sp.GetRequiredService<SettingsStorageService>());
+
             builder.Services.AddTransientWithShellRoute<ProjectDetailPage, ProjectDetailPageModel>("project");
             builder.Services.AddTransientWithShellRoute<TaskDetailPage, TaskDetailPageModel>("task");
 

@@ -16,7 +16,32 @@ public class RtspRecorder
     private const string ProfileH265 = "H265";
     private const string ProfilePCMU = "PCMU";
     MotionAnalyzer _motionAnalyzer;
-    private DateTime _lastMotionTime;
+    private DateTime? _lastMotionTime;
+    private bool _isRecording;
+
+    private CancellationTokenSource? _durationCts;
+    private Task? _durationLoop;
+
+    /// <summary>
+    /// Событие: запись началась (при переходе из состояния ожидания)
+    /// </summary>
+    public event Action? RecordingStarted;
+
+    /// <summary>
+    /// Событие: запись остановлена (при переходе из состояния записи)
+    /// </summary>
+    public event Action? RecordingStopped;
+
+    /// <summary>
+    /// Событие: изменилась длительность записи (вызывается ~раз в секунду)
+    /// </summary>
+    public event Action<TimeSpan>? RecordingDurationChanged;
+
+    /// <summary>
+    /// Текущая длительность записи. Если запись не идёт — TimeSpan.Zero.
+    /// </summary>
+    public TimeSpan RecordingDuration =>
+        _isRecording ? _bufferVideoStorage.CurrentBufferDuration : TimeSpan.Zero;
 
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
     public RtspRecorder(ILoggerFactory loggerFactory,
@@ -48,6 +73,7 @@ public class RtspRecorder
 
     public void Stop()
     {
+        StopDurationLoop();
         _client.Stop();
     }
 
@@ -55,12 +81,30 @@ public class RtspRecorder
     {
         _bufferVideoStorage.StartRecord();
         _bufferAudioStorage.StartRecord();
+
+        if (!_isRecording)
+        {
+            _isRecording = true;
+            _logger.LogInformation("Запись началась");
+            RecordingStarted?.Invoke();
+            StartDurationLoop();
+        }
     }
 
     public async Task StopRecordAsync()
     {
+        StopDurationLoop();
+
         await _bufferVideoStorage.StopRecordAsync();
         await _bufferAudioStorage.StopRecordAsync();
+
+        if (_isRecording)
+        {
+            _isRecording = false;
+            _logger.LogInformation("Запись остановлена");
+            RecordingStopped?.Invoke();
+            RecordingDurationChanged?.Invoke(TimeSpan.Zero);
+        }
     }
     void ReceiveAudioPCMx(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
@@ -94,15 +138,18 @@ public class RtspRecorder
                 var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
                 var unit = nalUnitMem.Slice(4);
                 _bufferVideoStorage.AddFrame(unit, nal_unit_type);
+
+                //TODO Запускаем запись по движению, если сейчас нет записи вручную
                 if (_motionAnalyzer.Append(unit.ToArray()))
                 {
                     StartRecord();
                     _lastMotionTime = DateTime.Now;
                 }
 
-                if ((DateTime.Now - _lastMotionTime).TotalSeconds > _settings.PostMotionDurationSec)
+                if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _settings.PostMotionDurationSec)
                 {
                     await StopRecordAsync();
+                    _lastMotionTime = null;
                 }
 
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
@@ -114,5 +161,50 @@ public class RtspRecorder
     {
         _client.Stop();
         _client.Connect(_settings.RtspUrl, _settings.RtspLogin, _settings.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+    }
+
+    // ── private: фоновый опрос длительности записи ──
+
+    private void StartDurationLoop()
+    {
+        StopDurationLoop();
+
+        _durationCts = new CancellationTokenSource();
+        var ct = _durationCts.Token;
+
+        _durationLoop = Task.Run(async () =>
+        {
+            var lastDuration = TimeSpan.Zero;
+
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(1000, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                var current = RecordingDuration;
+                if (current != lastDuration)
+                {
+                    lastDuration = current;
+                    RecordingDurationChanged?.Invoke(current);
+                }
+            }
+        }, ct);
+    }
+
+    private void StopDurationLoop()
+    {
+        if (_durationCts is not null)
+        {
+            _durationCts.Cancel();
+            _durationCts.Dispose();
+            _durationCts = null;
+            _durationLoop = null;
+        }
     }
 }

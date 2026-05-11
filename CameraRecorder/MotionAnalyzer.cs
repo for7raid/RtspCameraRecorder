@@ -60,6 +60,8 @@ public class MotionAnalyzer
 
         return hasMotion;
     }
+
+    //TODO заменить на Span<byte>
     private NalUnit ParseNalUnit(byte[] data, int index)
     {
         var unit = new NalUnit

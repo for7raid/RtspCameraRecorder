@@ -33,15 +33,15 @@ public class RingBufferAudioStorage
         var frame = new AudioFrame { Data = nalUnit.ToArray(), Timestamp = timestamp };
         _buffer.Enqueue(frame);
 
-        if (!_isRecording)
-        {
-            lock (_lockObj)
-            {
-                // Обновляем суммарную длительность буфера
-                if (_buffer.TryPeek(out var oldestFrame))
-                {
-                    _currentBufferDurationMs = (long)(timestamp - oldestFrame.Timestamp).TotalMilliseconds;
 
+        lock (_lockObj)
+        {
+            // Обновляем суммарную длительность буфера
+            if (_buffer.TryPeek(out var oldestFrame))
+            {
+                _currentBufferDurationMs = (long)(timestamp - oldestFrame.Timestamp).TotalMilliseconds;
+                if (!_isRecording)
+                {
                     //Удаляем кадры, которые старее 10 секунд
                     while (_currentBufferDurationMs > _maxDurationMs && _buffer.TryDequeue(out var f))
                     {
