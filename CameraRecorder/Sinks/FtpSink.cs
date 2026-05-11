@@ -6,32 +6,33 @@ namespace CameraRecorder.Sinks;
 
 public sealed class FtpSink : IStorageSink
 {
-    private readonly CameraRecorderSettings _settings;
+    private readonly ISettingsProvider _settingsProvider;
     private readonly ILogger<FtpSink> _logger;
 
     public string Name => "FTP";
 
     public FtpSink(ISettingsProvider settingsProvider, ILogger<FtpSink> logger)
     {
-        _settings = settingsProvider.GetSettings();
+        _settingsProvider = settingsProvider;
         _logger = logger;
     }
 
     public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
     {
-        if (!_settings.FtpEnabled)
+        var settings = _settingsProvider.GetSettings();
+        if (!settings.FtpEnabled)
         {
             _logger.LogDebug("FtpSink: FTP отключён, пропускаю");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_settings.FtpHost))
+        if (string.IsNullOrWhiteSpace(settings.FtpHost))
         {
             _logger.LogDebug("FtpSink: хост не задан, пропускаю");
             return;
         }
 
-        var uri = BuildUri(fileName);
+        var uri = BuildUri(settings, fileName);
 
         _logger.LogDebug("FtpSink: загружаю {FileName} на {Uri}", fileName, uri);
 
@@ -41,8 +42,8 @@ public sealed class FtpSink : IStorageSink
             var request = (FtpWebRequest)WebRequest.Create(uri);
 #pragma warning restore SYSLIB0014
             request.Method = WebRequestMethods.Ftp.UploadFile;
-            request.Credentials = new NetworkCredential(_settings.FtpLogin, _settings.FtpPassword);
-            request.EnableSsl = _settings.UseFtps;
+            request.Credentials = new NetworkCredential(settings.FtpLogin, settings.FtpPassword);
+            request.EnableSsl = settings.UseFtps;
             request.UsePassive = true;
             request.KeepAlive = false;
             request.Timeout = 30_000;
@@ -74,11 +75,11 @@ public sealed class FtpSink : IStorageSink
         }
     }
 
-    private Uri BuildUri(string fileName)
+    private Uri BuildUri(CameraRecorderSettings settings, string fileName)
     {
-        var scheme = _settings.UseFtps ? "ftps" : "ftp";
-        var host = _settings.FtpHost.TrimEnd('/');
-        var path = _settings.FtpDirectory + (fileName.StartsWith('/') ? fileName : "/" + fileName);
+        var scheme = settings.UseFtps ? "ftps" : "ftp";
+        var host = settings.FtpHost.TrimEnd('/');
+        var path = settings.FtpDirectory + (fileName.StartsWith('/') ? fileName : "/" + fileName);
         return new Uri($"{scheme}://{host}{path}");
     }
 }

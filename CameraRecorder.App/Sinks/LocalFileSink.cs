@@ -40,6 +40,8 @@ var context = Platform.CurrentActivity;
     {
         Android.Content.ContentResolver resolver = context.ContentResolver;
         Android.Content.ContentValues contentValues = new();
+        contentValues.Put(Android.Provider.MediaStore.Video.Media.InterfaceConsts.DisplayName, fileName);
+        //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
         contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
         contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "video/mp4");
         contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, _settings.LocalRecordingsPath);
@@ -51,8 +53,7 @@ var context = Platform.CurrentActivity;
     }
     else
     {
-        Java.IO.File storagePath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryMovies);
-        string path = System.IO.Path.Combine(storagePath.ToString(), fileName);
+        string path = System.IO.Path.Combine(_settings.LocalRecordingsPath, fileName);
          using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None,
             bufferSize: 81920, useAsync: true);
         await stream.CopyToAsync(fs, ct);

@@ -26,7 +26,7 @@ namespace RtspClientExample
             services.AddTransient<IMp4Logger, Mp4Logger>();
             services.AddTransient<ISettingsProvider, StaticSettingsProvider>();
 
-            services.AddTransient<IStorageSink, LocalFileSink>();
+            services.AddTransient<IStorageSink, LocalFileSink_>();
             services.AddTransient<IStorageSink, FtpSink>();
 
             services.AddLogging(builder =>

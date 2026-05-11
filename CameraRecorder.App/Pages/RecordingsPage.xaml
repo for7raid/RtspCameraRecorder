@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:CameraRecorder.App.PageModels"
+             xmlns:models="clr-namespace:CameraRecorder.App.Models"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:DataType="pageModels:RecordingsPageModel"
+             x:Class="CameraRecorder.App.Pages.RecordingsPage"
+             x:Name="RecordingsRoot"
+             Title="Записи">
+
+    <ContentPage.Behaviors>
+        <toolkit:EventToCommandBehavior
+                BindingContext="{Binding Path=BindingContext, Source={x:Reference RecordingsRoot}, x:DataType=ContentPage}"
+                EventName="Appearing"
+                Command="{Binding AppearingCommand}" />
+    </ContentPage.Behaviors>
+
+    <ContentPage.Resources>
+        <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+
+        <Style x:Key="FileNameStyle" TargetType="Label" BasedOn="{StaticResource Body1}">
+            <Setter Property="FontFamily" Value="OpenSansSemibold" />
+            <Setter Property="LineBreakMode" Value="TailTruncation" />
+        </Style>
+
+        <Style x:Key="MetaStyle" TargetType="Label" BasedOn="{StaticResource Caption1}">
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray400}}" />
+        </Style>
+    </ContentPage.Resources>
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Удалить всё"
+                     Command="{Binding DeleteAllCommand}"
+                     IsEnabled="{Binding IsEmpty, Converter={StaticResource InvertedBoolConverter}}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid>
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           Color="{StaticResource Primary}" />
+
+        <VerticalStackLayout IsVisible="{Binding IsEmpty}"
+                             VerticalOptions="Center" HorizontalOptions="Center"
+                             Spacing="10">
+            <Label Text="🎬" FontSize="48" HorizontalOptions="Center" />
+            <Label Text="Нет записанных файлов" Style="{StaticResource Body1}"
+                   HorizontalOptions="Center"
+                   TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray400}}" />
+        </VerticalStackLayout>
+
+        <CollectionView ItemsSource="{Binding Recordings}"
+                        IsVisible="{Binding IsEmpty, Converter={StaticResource InvertedBoolConverter}}">
+            <CollectionView.Header>
+                <VerticalStackLayout Padding="{StaticResource LayoutPadding}" Spacing="5">
+                    <Label Text="Записи" Style="{StaticResource Title2}" />
+                    <Label Text="{Binding Recordings.Count, StringFormat='Всего файлов: {0}'}"
+                           Style="{StaticResource Caption1}" />
+                </VerticalStackLayout>
+            </CollectionView.Header>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:VideoFileInfo">
+                    <SwipeView>
+                        <SwipeView.RightItems>
+                            <SwipeItems Mode="Execute">
+                                <SwipeItem Text="Удалить"
+                                           BackgroundColor="{StaticResource Magenta}"
+                                           Command="{Binding DeleteFileCommand, Source={RelativeSource AncestorType={x:Type pageModels:RecordingsPageModel}}, x:DataType=pageModels:RecordingsPageModel}"
+                                           CommandParameter="{Binding .}" />
+                            </SwipeItems>
+                        </SwipeView.RightItems>
+
+                        <Border Style="{StaticResource CardStyle}" Margin="15,5">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding OpenFileCommand, Source={RelativeSource AncestorType={x:Type pageModels:RecordingsPageModel}}, x:DataType=pageModels:RecordingsPageModel}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
+                                <Label Text="{Binding FileName}" Style="{StaticResource FileNameStyle}"
+                                       Grid.Row="0" Grid.Column="0" />
+                                <Label Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding SizeDisplay}"
+                                       Style="{StaticResource MetaStyle}"
+                                       VerticalOptions="Center" HorizontalOptions="End" />
+
+                                <Label Grid.Row="1" Grid.Column="0"
+                                       Text="{Binding FileType}"
+                                       Style="{StaticResource MetaStyle}" />
+
+                                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="{Binding CreatedDisplay}"
+                                       Style="{StaticResource MetaStyle}" />
+                            </Grid>
+                        </Border>
+                    </SwipeView>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Button Text="Обновить"
+                Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}"
+                HorizontalOptions="End" VerticalOptions="End"
+                Margin="0,0,20,20"
+                MinimumHeightRequest="44" MinimumWidthRequest="100"
+                ZIndex="10" />
+    </Grid>
+</ContentPage>

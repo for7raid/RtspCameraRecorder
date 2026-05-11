@@ -80,6 +80,12 @@
                      Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                      Size="{StaticResource IconSize}" />
 
+    <FontImageSource x:Key="IconVideo"
+                     Glyph="{x:Static f:FluentUI.video_24_regular}"
+                     FontFamily="{x:Static f:FluentUI.FontFamily}"
+                     Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                     Size="{StaticResource IconSize}" />
+
     <FontImageSource x:Key="IconRibbon"
                      Glyph="{x:Static f:FluentUI.ribbon_20_regular}"
                      FontFamily="{x:Static f:FluentUI.FontFamily}"

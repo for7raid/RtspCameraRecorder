@@ -136,11 +136,13 @@ public class RtspRecorder
                 var unit = nalUnitMem.Slice(4);
                 _bufferVideoStorage.AddFrame(unit, nal_unit_type);
 
-                //TODO Запускаем запись по движению, если сейчас нет записи вручную
-                if (_motionAnalyzer.Append(unit.ToArray()))
+                _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
+
+                //Запускаем запись по движению, если сейчас нет записи вручную
+                if ((!_isRecording || _lastMotionTime.HasValue) && _motionAnalyzer.Append(unit.ToArray()))
                 {
-                    //StartRecord();
-                    //_lastMotionTime = DateTime.Now;
+                    StartRecord();
+                    _lastMotionTime = DateTime.Now;
                 }
 
                 if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _settings.PostMotionDurationSec)
@@ -159,7 +161,6 @@ public class RtspRecorder
                     }
                 }
 
-                _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
             }
         }
     }

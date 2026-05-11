@@ -27,6 +27,12 @@
         Route="manage" />
 
     <ShellContent
+        Title="Записи"
+        Icon="{StaticResource IconVideo}"
+        ContentTemplate="{DataTemplate pages:RecordingsPage}"
+        Route="recordings" />
+
+    <ShellContent
         Title="Логи"
         Icon="{StaticResource IconLogs}"
         ContentTemplate="{DataTemplate pages:LogFilesPage}"
