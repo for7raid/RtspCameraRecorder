@@ -82,6 +82,6 @@ public class MotionSensitivity
         MinPayloadLength = 20,
         VerboseLevel = 1,
 
-        MovieFramesRatioThreshold = 0.2
+        MovieFramesRatioThreshold = 0.15
     };
 }
