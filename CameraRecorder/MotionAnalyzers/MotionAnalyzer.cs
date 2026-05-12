@@ -15,7 +15,7 @@ public class NalUnit
     private int GetHeaderSize() => Type == NalUnitType.Unknown ? 1 : (IsHevc ? 2 : 1);
 
     public bool IsHevc { get; set; }
-    public bool IsVcl => IsHevc ? (int)Type <= 31 : (Type == NalUnitType.H264_NonIDR || Type == NalUnitType.H264_IDR);
+    public bool IsVcl => IsHevc ? (int)Type <= 31 : (Type is NalUnitType.H264_NonIDR_H265_TRAIL_R or NalUnitType.H264_IDR);
 
     // Для отладки
     public double NonZeroBytesRatio { get; set; } = 0;
@@ -192,7 +192,7 @@ public class MotionAnalyzer
         else
         {
             // H.264: тип 1 = non-IDR (P/B), тип 5 = IDR (I)
-            return unit.Type == NalUnitType.H264_NonIDR;
+            return unit.Type == NalUnitType.H264_NonIDR_H265_TRAIL_R;
         }
     }
 
