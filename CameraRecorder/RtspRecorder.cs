@@ -41,6 +41,11 @@ public class RtspRecorder
     public TimeSpan RecordingDuration =>
         _isRecording ? _bufferVideoStorage.CurrentBufferDuration : TimeSpan.Zero;
 
+    /// <summary>
+    /// Ведется ли сейчас запись
+    /// </summary>
+    public bool IsRecording => _isRecording;
+
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
     public RtspRecorder(ILoggerFactory loggerFactory,
         RTSPClient client,
@@ -138,12 +143,12 @@ public class RtspRecorder
 
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
 
-                //Запускаем запись по движению, если сейчас нет записи вручную
-                if ((!_isRecording || _lastMotionTime.HasValue) && _motionAnalyzer.Append(unit.ToArray()))
-                {
-                    StartRecord();
-                    _lastMotionTime = DateTime.Now;
-                }
+                ////Запускаем запись по движению, если сейчас нет записи вручную
+                //if ((!_isRecording || _lastMotionTime.HasValue) && _motionAnalyzer.Append(unit.ToArray()))
+                //{
+                //    StartRecord();
+                //    _lastMotionTime = DateTime.Now;
+                //}
 
                 if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _settings.PostMotionDurationSec)
                 {

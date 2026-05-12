@@ -3,6 +3,7 @@ using CameraRecorder.Sinks;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 using SharpMP4.Common;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 using Syncfusion.Maui.Toolkit.Hosting;
 
 namespace CameraRecorder.App
@@ -15,6 +16,7 @@ namespace CameraRecorder.App
             builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
+                .UseSkiaSharp()
                 .ConfigureSyncfusionToolkit()
                 .ConfigureMauiHandlers(handlers =>
                 {
@@ -42,6 +44,7 @@ namespace CameraRecorder.App
             builder.Services.AddTransient<RingBufferAudioStorage>();
             builder.Services.AddTransient<RTSPClient>();
             builder.Services.AddTransient<RtspRecorder>();
+            builder.Services.AddTransient<RtspViewer>();
             builder.Services.AddTransient<IMp4Logger, Mp4Logger>();
 
             builder.Services.AddTransient<IStorageSink, LocalFileSink>();

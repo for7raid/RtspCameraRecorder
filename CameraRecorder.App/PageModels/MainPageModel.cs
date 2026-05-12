@@ -1,5 +1,7 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CameraRecorder.MotionAnalyzers;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 
 namespace CameraRecorder.App.PageModels
 {
@@ -8,8 +10,7 @@ namespace CameraRecorder.App.PageModels
         private bool _isNavigatedTo;
 
         private readonly RtspRecorder _rtspRecorder;
-
-
+        private readonly RtspViewer _rtspViewer;
         [ObservableProperty]
         bool _isRecording;
 
@@ -22,13 +23,19 @@ namespace CameraRecorder.App.PageModels
         [ObservableProperty]
         private string _today = DateTime.Now.ToString("dddd, MMM d");
 
+        private DateTime? _lastMotionTime;
+
+        [ObservableProperty]
+        private string _log;
+
         public MainPageModel(
-            RtspRecorder rtspRecorder)
+            RtspRecorder rtspRecorder,
+            RtspViewer rtspViewer,
+            ILoggerFactory loggerFactory)
         {
 
             _rtspRecorder = rtspRecorder;
-
-
+            _rtspViewer = rtspViewer;
             _rtspRecorder.RecordingStarted += () => IsRecording = true;
             _rtspRecorder.RecordingStopped += () => IsRecording = false;
             _rtspRecorder.RecordingDurationChanged += (duration) =>
@@ -38,6 +45,52 @@ namespace CameraRecorder.App.PageModels
             };
 
             _rtspRecorder.Start();
+
+            MotionDetectorSettings settings = new()
+            {
+                Width = 640,
+                Height = 480,
+                BlockSize = 6,                        // Компромисс: 6×6 (106×80 ≈ 8 500 блоков)
+                FrameBufferSize = 30,
+
+                // Ключевые параметры
+                ChangedBlocksRatioThreshold = 0.015,  // 1.5% (около 130 блоков)
+                BaseBrightnessThreshold = 12,         // Низкий порог для плохого освещения
+
+                // Адаптация
+                EnableAutoAdaptation = true,
+                AdaptationSpeed = 0.12,
+                MinFramesBeforeDetection = 10,
+                StatsRecalculationPeriod = 30,
+
+                // Фильтры
+                UseAdaptiveBackground = true,
+                EnableSpikeFilter = true,
+                MinMotionDuration = 4,                // 2 кадра подряд для подтверждения
+                MaxGlobalBrightnessChange = 50
+            };
+
+            var detector = new AdaptiveMotionDetector(settings, loggerFactory.CreateLogger<AdaptiveMotionDetector>());
+
+            rtspViewer.FrameReceived += async (rgbBytes) =>
+            {
+                var result = detector.DetectMotion(rgbBytes);
+                Log = result.ToString();    
+                //Запускаем запись по движению, если сейчас нет записи вручную
+                //if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
+                //{
+                //    _rtspRecorder.StartRecord();
+                //    _lastMotionTime = DateTime.Now;
+
+                //}
+                //if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > 10) //TODO Заменить на настройку
+                //{
+                //    await _rtspRecorder.StopRecordAsync();
+                //    _lastMotionTime = null;
+                //}
+
+            };
+            _rtspViewer.Start();
         }
 
 

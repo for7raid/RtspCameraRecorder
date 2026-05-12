@@ -23,6 +23,7 @@ namespace RtspClientExample
             services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
+            services.AddTransient<RtspViewer>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
             services.AddTransient<ISettingsProvider, StaticSettingsProvider>();
 
@@ -48,7 +49,7 @@ namespace RtspClientExample
             var serviceProvider = services.BuildServiceProvider();
 
             // Получаем сервис
-            var recorder = serviceProvider.GetRequiredService<RtspRecorder>();
+            var recorder = serviceProvider.GetRequiredService<RtspViewer>();
             logger = serviceProvider.GetRequiredService<ILogger<Recorder>>();
 
 
@@ -78,14 +79,14 @@ namespace RtspClientExample
                 if (key.Key == ConsoleKey.R)
                 {
                     logger.LogInformation($"Start recording {DateTime.Now:HH:mm:ss}");
-                    recorder.StartRecord();
+                    //recorder.StartRecord();
                     stopwatch.Start();
                 }
                 else if (key.Key == ConsoleKey.S)
                 {
                     stopwatch.Stop();
                     logger.LogInformation($"Stop recording {stopwatch.Elapsed}");
-                    recorder.StopRecordAsync();
+                    //recorder.StopRecordAsync();
                 }
             }
 

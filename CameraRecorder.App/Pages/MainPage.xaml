@@ -5,6 +5,7 @@
              xmlns:models="clr-namespace:CameraRecorder.App.Models"
              xmlns:pullToRefresh="clr-namespace:Syncfusion.Maui.Toolkit.PullToRefresh;assembly=Syncfusion.Maui.Toolkit"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:skiasharp="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="CameraRecorder.App.Pages.MainPage"
              x:DataType="pageModels:MainPageModel"
              x:Name="OverviewPage"
@@ -44,7 +45,7 @@
     </ContentPage.ToolbarItems>
 
     <Grid>
-        
-        
+        <Label Text="{Binding Log}"/>
+
     </Grid>
 </ContentPage>
