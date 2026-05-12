@@ -132,7 +132,7 @@ public class MotionDetectionResult
     public int ChangedBlocksCount { get; set; }
     public int TotalBlocksCount { get; set; }
     public double AverageChangeIntensity { get; set; }
-    public bool[,] ChangedBlocksMap { get; set; }
+    public bool[] ChangedBlocksMap { get; set; }
     public double ProcessingTimeMs { get; set; }
     public LightingStats LightingStats { get; set; }
     public byte CurrentThreshold { get; set; }
@@ -142,6 +142,7 @@ public class MotionDetectionResult
     {
         return $"Motion: {(HasMotion ? "YES" : "NO")}, " +
                $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:F2}%), " +
+               $"AverageChangeIntensity: {AverageChangeIntensity}, " +
                $"Threshold: {CurrentThreshold}, " +
                $"Lighting: {LightingStats?.GlobalBrightness:F1}";
     }
@@ -154,7 +155,7 @@ public class AdaptiveMotionDetector
 {
     private readonly MotionDetectorSettings _settings;
     private readonly ILogger<AdaptiveMotionDetector> _logger;
-    private readonly Queue<byte[,]> _frameBuffer;
+    private readonly Queue<byte[]> _frameBuffer;
     private readonly Queue<double> _globalBrightnessHistory;
     private readonly int _blocksPerRow;
     private readonly int _blocksPerCol;
@@ -164,13 +165,17 @@ public class AdaptiveMotionDetector
     private int _framesSinceLastStats;
     private LightingStats _currentLightingStats;
     private byte _currentAdaptiveThreshold;
-    private byte[,] _adaptiveBackground;
+    private byte[] _adaptiveBackground;
     private readonly Queue<bool> _motionHistory;
     private double _baselineNoiseLevel;
+    private double _referenceGlobalBrightness;
 
     // Для фильтрации всплесков
     private int _consecutiveMotionFrames;
     private int _consecutiveNoMotionFrames;
+
+    // ── Helper: index = row * _blocksPerRow + col ──
+    private int Idx(int row, int col) => row * _blocksPerRow + col;
 
 
     public AdaptiveMotionDetector(MotionDetectorSettings settings, ILogger<AdaptiveMotionDetector> logger)
@@ -182,7 +187,7 @@ public class AdaptiveMotionDetector
         _blocksPerRow = settings.Width / settings.BlockSize;
         _totalBlocks = _blocksPerCol * _blocksPerRow;
 
-        _frameBuffer = new Queue<byte[,]>();
+        _frameBuffer = new Queue<byte[]>();
         _globalBrightnessHistory = new Queue<double>();
         _motionHistory = new Queue<bool>();
         _currentAdaptiveThreshold = settings.BaseBrightnessThreshold;
@@ -274,17 +279,17 @@ public class AdaptiveMotionDetector
     }
 
     /// <summary>
-    /// Получение карты яркости блоков
+    /// Получение одномерной карты яркости блоков (row-major)
     /// </summary>
-    private byte[,] GetBlockBrightnessMap(byte[] rgbaData)
+    private byte[] GetBlockBrightnessMap(byte[] rgbaData)
     {
-        var brightnessMap = new byte[_blocksPerCol, _blocksPerRow];
+        var brightnessMap = new byte[_totalBlocks];
 
         for (int row = 0; row < _blocksPerCol; row++)
         {
             for (int col = 0; col < _blocksPerRow; col++)
             {
-                brightnessMap[row, col] = GetBlockAverageBrightness(rgbaData, row, col);
+                brightnessMap[Idx(row, col)] = GetBlockAverageBrightness(rgbaData, row, col);
             }
         }
 
@@ -294,22 +299,19 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Расчёт статистики освещения
     /// </summary>
-    private LightingStats CalculateLightingStats(byte[,] brightnessMap)
+    private LightingStats CalculateLightingStats(byte[] brightnessMap)
     {
         var stats = new LightingStats();
 
         // Средняя яркость кадра
         double totalBrightness = 0;
-        var allValues = new List<byte>();
+        var allValues = new List<byte>(_totalBlocks);
 
-        for (int row = 0; row < _blocksPerCol; row++)
+        for (int i = 0; i < _totalBlocks; i++)
         {
-            for (int col = 0; col < _blocksPerRow; col++)
-            {
-                byte val = brightnessMap[row, col];
-                totalBrightness += val;
-                allValues.Add(val);
-            }
+            byte val = brightnessMap[i];
+            totalBrightness += val;
+            allValues.Add(val);
         }
 
         stats.GlobalBrightness = totalBrightness / _totalBlocks;
@@ -325,8 +327,8 @@ public class AdaptiveMotionDetector
         {
             for (int col = 0; col < _blocksPerRow - 1; col++)
             {
-                int diffHorizontal = Math.Abs(brightnessMap[row, col] - brightnessMap[row, col + 1]);
-                int diffVertical = Math.Abs(brightnessMap[row, col] - brightnessMap[row + 1, col]);
+                int diffHorizontal = Math.Abs(brightnessMap[Idx(row, col)] - brightnessMap[Idx(row, col + 1)]);
+                int diffVertical = Math.Abs(brightnessMap[Idx(row, col)] - brightnessMap[Idx(row + 1, col)]);
                 noiseSum += diffHorizontal + diffVertical;
                 noiseCount += 2;
             }
@@ -368,33 +370,31 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Обновление адаптивного фона
     /// </summary>
-    private void UpdateAdaptiveBackground(byte[,] currentMap)
+    private void UpdateAdaptiveBackground(byte[] currentMap)
     {
         if (_adaptiveBackground == null)
         {
-            _adaptiveBackground = (byte[,])currentMap.Clone();
+            _adaptiveBackground = new byte[_totalBlocks];
+            Array.Copy(currentMap, _adaptiveBackground, _totalBlocks);
             return;
         }
 
         // Экспоненциальное скользящее среднее для фона
         double alpha = _settings.AdaptationSpeed;
 
-        for (int row = 0; row < _blocksPerCol; row++)
+        for (int i = 0; i < _totalBlocks; i++)
         {
-            for (int col = 0; col < _blocksPerRow; col++)
-            {
-                _adaptiveBackground[row, col] = (byte)(
-                    _adaptiveBackground[row, col] * (1 - alpha) +
-                    currentMap[row, col] * alpha
-                );
-            }
+            _adaptiveBackground[i] = (byte)(
+                _adaptiveBackground[i] * (1 - alpha) +
+                currentMap[i] * alpha
+            );
         }
     }
 
     /// <summary>
     /// Получение фоновой карты (медианный фильтр или адаптивный фон)
     /// </summary>
-    private byte[,] GetBackgroundMap()
+    private byte[] GetBackgroundMap()
     {
         if (_settings.UseAdaptiveBackground && _adaptiveBackground != null)
         {
@@ -406,15 +406,12 @@ public class AdaptiveMotionDetector
 
         // Медианный фильтр из буфера
         var frameList = _frameBuffer.ToList();
-        byte[,] medianBackground = new byte[_blocksPerCol, _blocksPerRow];
+        var medianBackground = new byte[_totalBlocks];
 
-        for (int row = 0; row < _blocksPerCol; row++)
+        for (int i = 0; i < _totalBlocks; i++)
         {
-            for (int col = 0; col < _blocksPerRow; col++)
-            {
-                var values = frameList.Select(f => f[row, col]).OrderBy(v => v).ToList();
-                medianBackground[row, col] = values[values.Count / 2];
-            }
+            var values = frameList.Select(f => f[i]).OrderBy(v => v).ToList();
+            medianBackground[i] = values[values.Count / 2];
         }
 
         return medianBackground;
@@ -423,17 +420,14 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Сравнение двух карт яркости
     /// </summary>
-    private bool[,] CompareBrightnessMaps(byte[,] current, byte[,] reference, byte threshold)
+    private bool[] CompareBrightnessMaps(byte[] current, byte[] reference, byte threshold)
     {
-        bool[,] changed = new bool[_blocksPerCol, _blocksPerRow];
+        var changed = new bool[_totalBlocks];
 
-        for (int row = 0; row < _blocksPerCol; row++)
+        for (int i = 0; i < _totalBlocks; i++)
         {
-            for (int col = 0; col < _blocksPerRow; col++)
-            {
-                int diff = Math.Abs(current[row, col] - reference[row, col]);
-                changed[row, col] = diff >= threshold;
-            }
+            int diff = Math.Abs(current[i] - reference[i]);
+            changed[i] = diff >= threshold;
         }
 
         return changed;
@@ -442,7 +436,7 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Проверка глобального изменения освещения
     /// </summary>
-    private bool IsGlobalLightingChange(byte[,] currentMap)
+    private bool IsGlobalLightingChange(byte[] currentMap)
     {
         if (_globalBrightnessHistory.Count < 10)
             return false;
@@ -487,7 +481,7 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Обновление статистики освещения (периодически)
     /// </summary>
-    private void UpdateLightingStatsPeriodic(byte[,] brightnessMap)
+    private void UpdateLightingStatsPeriodic(byte[] brightnessMap)
     {
         _framesSinceLastStats++;
 
@@ -526,18 +520,15 @@ public class AdaptiveMotionDetector
         var currentMap = GetBlockBrightnessMap(rgbaData);
 
         // Обновляем историю глобальной яркости
-        long sum = 0;
-        for (int row = 0; row < _blocksPerCol; row++)
-        {
-            for (int col = 0; col < _blocksPerRow; col++)
-            {
-                sum += currentMap[row, col];
-            }
-        }
+        long sum = currentMap.Sum(x => x);
         double globalBrightness = (double)sum / _totalBlocks;
+
         _globalBrightnessHistory.Enqueue(globalBrightness);
+
         while (_globalBrightnessHistory.Count > 100)
             _globalBrightnessHistory.Dequeue();
+
+
 
         // Добавляем в буфер
         _frameBuffer.Enqueue(currentMap);
@@ -560,7 +551,7 @@ public class AdaptiveMotionDetector
         }
 
         // Получаем эталонный фон
-        byte[,] background = GetBackgroundMap();
+        byte[] background = GetBackgroundMap();
 
         if (background == null)
         {
@@ -590,27 +581,20 @@ public class AdaptiveMotionDetector
         var changedMap = CompareBrightnessMaps(currentMap, background, threshold);
 
         // Подсчитываем изменения
-        int changedCount = 0;
-        for (int row = 0; row < _blocksPerCol; row++)
-            for (int col = 0; col < _blocksPerRow; col++)
-                if (changedMap[row, col]) changedCount++;
-
+        int changedCount = changedMap.Count(x => x);
         double changedPercent = (double)changedCount / _totalBlocks * 100;
 
         // Вычисляем интенсивность изменений
         double avgChangeIntensity = 0;
         long totalDiff = 0;
         int diffCount = 0;
-        for (int row = 0; row < _blocksPerCol; row++)
+        for (int i = 0; i < _totalBlocks; i++)
         {
-            for (int col = 0; col < _blocksPerRow; col++)
+            int diff = Math.Abs(currentMap[i] - background[i]);
+            if (diff >= threshold)
             {
-                int diff = Math.Abs(currentMap[row, col] - background[row, col]);
-                if (diff >= threshold)
-                {
-                    totalDiff += diff;
-                    diffCount++;
-                }
+                totalDiff += diff;
+                diffCount++;
             }
         }
         avgChangeIntensity = diffCount > 0 ? (double)totalDiff / diffCount : 0;

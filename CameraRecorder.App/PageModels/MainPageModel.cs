@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
 
 namespace CameraRecorder.App.PageModels
 {
@@ -26,7 +27,10 @@ namespace CameraRecorder.App.PageModels
         private DateTime? _lastMotionTime;
 
         [ObservableProperty]
-        private string _log;
+        private string _log = string.Empty;
+
+        [ObservableProperty]
+        ObservableCollection<string> _logs = new();
 
         public MainPageModel(
             RtspRecorder rtspRecorder,
@@ -54,7 +58,7 @@ namespace CameraRecorder.App.PageModels
                 FrameBufferSize = 30,
 
                 // Ключевые параметры
-                ChangedBlocksRatioThreshold = 0.015,  // 1.5% (около 130 блоков)
+                ChangedBlocksRatioThreshold = 0.03,  // 1.5% (около 130 блоков)
                 BaseBrightnessThreshold = 12,         // Низкий порог для плохого освещения
 
                 // Адаптация
@@ -75,7 +79,8 @@ namespace CameraRecorder.App.PageModels
             rtspViewer.FrameReceived += async (rgbBytes) =>
             {
                 var result = detector.DetectMotion(rgbBytes);
-                Log = result.ToString();    
+                Log = Log.Substring(Math.Max(0, Log.Length - 700)) + Environment.NewLine + result.ToString() + Environment.NewLine + detector.GetAdaptationStats();
+
                 //Запускаем запись по движению, если сейчас нет записи вручную
                 //if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
                 //{
