@@ -3,6 +3,7 @@ using CameraRecorder.Sinks;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Text;
+using Microsoft.Extensions.Options;
 
 namespace CameraRecorder;
 
@@ -10,24 +11,23 @@ public class RingBufferAudioStorage
 {
     private readonly ConcurrentQueue<AudioFrame> _buffer = new();
     private readonly object _lockObj = new();
-    private readonly int _maxDurationMs;
     private readonly ILogger<RingBufferAudioStorage> _logger;
+    private readonly IOptions<CameraRecorderSettings> _options;
     private readonly IStorageSink[] _sinks;
-    private readonly CameraRecorderSettings _settings;
     private long _currentBufferDurationMs = 0;
 
     private bool _isRecording;
-    public RingBufferAudioStorage(ILogger<RingBufferAudioStorage> logger, IEnumerable<IStorageSink> sinks, ISettingsProvider settingsProvider)
+    public RingBufferAudioStorage(ILogger<RingBufferAudioStorage> logger, IEnumerable<IStorageSink> sinks, IOptions<CameraRecorderSettings> options)
     {
         _logger = logger;
+        _options = options;
         _sinks = sinks?.ToArray() ?? [];
-        _settings = settingsProvider.GetSettings();
-        _maxDurationMs = _settings.PreMotionDurationSec * 1000;
     }
 
     // Вызывается для каждого полученного кадра из SharpRTSP
     public void AddFrame(ReadOnlyMemory<byte> nalUnit)
     {
+        var maxDurationMs = _options.Value.PreMotionDurationSec * 1000;
         var timestamp = DateTime.Now;
 
         var frame = new AudioFrame { Data = nalUnit.ToArray(), Timestamp = timestamp };
@@ -43,7 +43,7 @@ public class RingBufferAudioStorage
                 if (!_isRecording)
                 {
                     //Удаляем кадры, которые старее 10 секунд
-                    while (_currentBufferDurationMs > _maxDurationMs && _buffer.TryDequeue(out var f))
+                    while (_currentBufferDurationMs > maxDurationMs && _buffer.TryDequeue(out var f))
                     {
                         _currentBufferDurationMs = (long)(timestamp - f.Timestamp).TotalMilliseconds;
                     }

@@ -1,23 +1,25 @@
 using CameraRecorder.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CameraRecorder.Sinks;
 
 public sealed class LocalFileSink_ : IStorageSink
 {
-    private readonly CameraRecorderSettings _settings;
+    private readonly IOptions<CameraRecorderSettings> _options;
     private readonly ILogger<LocalFileSink_> _logger;
 
     public string Name => "LocalFile";
 
-    public LocalFileSink_(ISettingsProvider settingsProvider, ILogger<LocalFileSink_> logger)
+    public LocalFileSink_(IOptions<CameraRecorderSettings> options, ILogger<LocalFileSink_> logger)
     {
-        _settings = settingsProvider.GetSettings();
+        _options = options;
         _logger = logger;
     }
 
     public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
     {
+        var _settings = _options.Value;
         if (!_settings.LocalStorageEnabled)
         {
             _logger.LogDebug("LocalFileSink: локальное хранилище отключено, пропускаю");

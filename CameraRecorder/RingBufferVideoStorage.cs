@@ -6,6 +6,7 @@ using SharpMP4.Builders;
 using SharpMP4.Common;
 using SharpMP4.Tracks;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Options;
 
 namespace CameraRecorder;
 
@@ -13,11 +14,10 @@ public class RingBufferVideoStorage
 {
     private readonly ConcurrentQueue<VideoFrame> _buffer = new();
     private readonly object _lockObj = new();
-    private readonly int _maxDurationMs;
     private readonly ILogger<RingBufferVideoStorage> _logger;
     private readonly IMp4Logger _mp4Logger;
+    private readonly IOptions<CameraRecorderSettings> _options;
     private readonly IStorageSink[] _sinks;
-    private readonly CameraRecorderSettings _settings;
     private long _currentBufferDurationMs = 0;
 
     private bool _isRecording;
@@ -28,18 +28,18 @@ public class RingBufferVideoStorage
     public TimeSpan CurrentBufferDuration => TimeSpan.FromMilliseconds(_currentBufferDurationMs);
 
 
-    public RingBufferVideoStorage(ILogger<RingBufferVideoStorage> logger, IMp4Logger mp4Logger, IEnumerable<IStorageSink> sinks, ISettingsProvider settingsProvider)
+    public RingBufferVideoStorage(ILogger<RingBufferVideoStorage> logger, IMp4Logger mp4Logger, IEnumerable<IStorageSink> sinks, IOptions<CameraRecorderSettings> options)
     {
         _logger = logger;
         _mp4Logger = mp4Logger;
+        _options = options;
         _sinks = sinks?.ToArray() ?? [];
-        _settings = settingsProvider.GetSettings();
-        _maxDurationMs = _settings.PreMotionDurationSec * 1000;
     }
 
     // Вызывается для каждого полученного кадра из SharpRTSP
     public void AddFrame(ReadOnlyMemory<byte> nalUnit, NalUnitType unitType)
     {
+        var maxDurationMs = _options.Value.PreMotionDurationSec * 1000;
         var timestamp = DateTime.Now;
 
         var frame = new VideoFrame { Data = nalUnit.ToArray(), Timestamp = timestamp, UnitType = unitType };
@@ -57,7 +57,7 @@ public class RingBufferVideoStorage
                 {
                     //Удаляем кадры, которые старее 10 секунд или кадры из середины
                     VideoFrame f;
-                    while (_currentBufferDurationMs > _maxDurationMs && _buffer.TryDequeue(out f) || _buffer.TryPeek(out f) && f.UnitType != NalUnitType.H265_VPS && _buffer.TryDequeue(out f))
+                    while (_currentBufferDurationMs > maxDurationMs && _buffer.TryDequeue(out f) || _buffer.TryPeek(out f) && f.UnitType != NalUnitType.H265_VPS && _buffer.TryDequeue(out f))
                     {
                         _currentBufferDurationMs = (long)(timestamp - f.Timestamp).TotalMilliseconds;
                     }

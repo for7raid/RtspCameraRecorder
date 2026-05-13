@@ -1,7 +1,9 @@
 ﻿using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
 using CommunityToolkit.Maui;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SharpMP4.Common;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 using Syncfusion.Maui.Toolkit.Hosting;
@@ -21,10 +23,10 @@ namespace CameraRecorder.App
                 .ConfigureMauiHandlers(handlers =>
                 {
 #if WINDOWS
-    				Microsoft.Maui.Controls.Handlers.Items.CollectionViewHandler.Mapper.AppendToMapping("KeyboardAccessibleCollectionView", (handler, view) =>
-    				{
-    					handler.PlatformView.SingleSelectionFollowsFocus = false;
-    				});
+                    Microsoft.Maui.Controls.Handlers.Items.CollectionViewHandler.Mapper.AppendToMapping("KeyboardAccessibleCollectionView", (handler, view) =>
+                    {
+                        handler.PlatformView.SingleSelectionFollowsFocus = false;
+                    });
 #endif
                 })
                 .ConfigureFonts(fonts =>
@@ -61,7 +63,12 @@ namespace CameraRecorder.App
                     .AddFile(Path.Combine(FileSystem.AppDataDirectory, "logs", $"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}-{Environment.OSVersion}.txt"));
             });
 
-
+            //var configuration = new ConfigurationBuilder()
+            //     .AddJsonFile(Path.Combine(FileSystem.AppDataDirectory, "camerarecorder.settings.json"), optional: true, reloadOnChange: true)
+            //     .Build();
+            //builder.Services.AddSingleton<IConfiguration>(configuration);
+            //builder.Services.AddOptions();
+            //builder.Services.Configure<CameraRecorderSettings>(configuration);
 
             builder.Services.AddSingleton<ModalErrorHandler>();
             builder.Services.AddSingleton<MainPageModel>();
@@ -70,9 +77,13 @@ namespace CameraRecorder.App
             builder.Services.AddSingleton<SettingsPageModel>();
 
             // Настройки: один инстанс — и для провайдера, и для хранилища
+            //builder.Services.AddSingleton<ISettingsStorageService, SettingsStorageService>();
+
             builder.Services.AddSingleton<SettingsStorageService>();
-            builder.Services.AddSingleton<ISettingsProvider>(sp => sp.GetRequiredService<SettingsStorageService>());
+            builder.Services.AddSingleton<IOptions<CameraRecorderSettings>>(sp => sp.GetRequiredService<SettingsStorageService>());
             builder.Services.AddSingleton<ISettingsStorageService>(sp => sp.GetRequiredService<SettingsStorageService>());
+
+
 
             return builder.Build();
         }

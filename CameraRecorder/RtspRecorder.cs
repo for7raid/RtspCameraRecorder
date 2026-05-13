@@ -1,17 +1,17 @@
 ﻿using CameraRecorder.MotionAnalyzers;
 using CameraRecorder.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CameraRecorder;
 
 public class RtspRecorder
 {
     private readonly ILogger<RtspRecorder> _logger;
-    private readonly CameraRecorderSettings _settings;
     private readonly ILoggerFactory _loggerFactory;
     private readonly RTSPClient _client;
     private readonly RingBufferAudioStorage _bufferAudioStorage;
-    private readonly ISettingsProvider _settingsProvider;
+    private readonly IOptions<CameraRecorderSettings> _options;
     private readonly RingBufferVideoStorage _bufferVideoStorage;
     private const string ProfileH264 = "H264";
     private const string ProfileH265 = "H265";
@@ -51,15 +51,14 @@ public class RtspRecorder
         RTSPClient client,
         RingBufferVideoStorage bufferVideoStorage,
         RingBufferAudioStorage bufferAudioStorage,
-        ISettingsProvider settingsProvider)
+        IOptions<CameraRecorderSettings> options)
     {
         _loggerFactory = loggerFactory;
         _client = client;
         _bufferAudioStorage = bufferAudioStorage;
-        _settingsProvider = settingsProvider;
+        _options = options;
         _bufferVideoStorage = bufferVideoStorage;
         _logger = _loggerFactory.CreateLogger<RtspRecorder>();
-        _settings = _settingsProvider.GetSettings();
 
         _motionAnalyzer = new(VideoCodec.H265, loggerFactory.CreateLogger<MotionAnalyzer>(), MotionSensitivity.SlowHand);
 
@@ -150,7 +149,7 @@ public class RtspRecorder
                 //    _lastMotionTime = DateTime.Now;
                 //}
 
-                if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _settings.PostMotionDurationSec)
+                if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
                 {
                     await StopRecordAsync();
                     _lastMotionTime = null;
@@ -173,9 +172,9 @@ public class RtspRecorder
     public void Start()
     {
         _client.Stop();
-        if (!string.IsNullOrWhiteSpace(_settings.RtspUrl))
+        if (!string.IsNullOrWhiteSpace(_options.Value.RtspUrl))
         {
-            _client.Connect(_settings.RtspUrl, _settings.RtspLogin, _settings.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+            _client.Connect(_options.Value.RtspUrl, _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
         }
     }
 }

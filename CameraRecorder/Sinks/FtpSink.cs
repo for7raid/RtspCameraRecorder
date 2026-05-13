@@ -1,25 +1,26 @@
 using CameraRecorder.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Net;
 
 namespace CameraRecorder.Sinks;
 
 public sealed class FtpSink : IStorageSink
 {
-    private readonly ISettingsProvider _settingsProvider;
+    private readonly IOptions<CameraRecorderSettings> _options;
     private readonly ILogger<FtpSink> _logger;
 
     public string Name => "FTP";
 
-    public FtpSink(ISettingsProvider settingsProvider, ILogger<FtpSink> logger)
+    public FtpSink(IOptions<CameraRecorderSettings> options, ILogger<FtpSink> logger)
     {
-        _settingsProvider = settingsProvider;
+        _options = options;
         _logger = logger;
     }
 
     public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
     {
-        var settings = _settingsProvider.GetSettings();
+        var settings = _options.Value;
         if (!settings.FtpEnabled)
         {
             _logger.LogDebug("FtpSink: FTP отключён, пропускаю");

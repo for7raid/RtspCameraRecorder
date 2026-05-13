@@ -1,10 +1,9 @@
 using CameraRecorder.Settings;
 using Microsoft.Extensions.Configuration;
-using System.Threading.Tasks;
 
 namespace CameraRecorder;
 
-public class StaticSettingsProvider : ISettingsProvider
+public class StaticSettingsProvider 
 {
     private readonly CameraRecorderSettings _settings;
     private readonly IConfigurationRoot _config;

@@ -1,9 +1,10 @@
 using CameraRecorder.Settings;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace CameraRecorder.App.Services;
 
-public class SettingsStorageService : ISettingsProvider, ISettingsStorageService
+public class SettingsStorageService : ISettingsStorageService, IOptions<CameraRecorderSettings>
 {
     private static readonly string FilePath =
         Path.Combine(FileSystem.AppDataDirectory, "camerarecorder.settings.json");
@@ -16,15 +17,14 @@ public class SettingsStorageService : ISettingsProvider, ISettingsStorageService
 
     private CameraRecorderSettings _cached;
 
+    public CameraRecorderSettings Value => _cached;
+
     public SettingsStorageService()
     {
         _cached = LoadFromFile();
     }
 
-    // ── ISettingsProvider ──
-    public CameraRecorderSettings GetSettings() => _cached;
 
-    // ── ISettingsStorageService ──
     public Task<CameraRecorderSettings> LoadAsync()
     {
         _cached = LoadFromFile();

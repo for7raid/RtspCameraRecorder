@@ -3,13 +3,13 @@ using CameraRecorder.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
+using Microsoft.Extensions.Options;
 
 namespace CameraRecorder.App.PageModels;
 
 public partial class RecordingsPageModel : ObservableObject
 {
-    private readonly ISettingsProvider _settingsProvider;
-
+    private readonly IOptions<CameraRecorderSettings> _options;
     [ObservableProperty]
     private ObservableCollection<VideoFileInfo> _recordings = [];
 
@@ -19,9 +19,9 @@ public partial class RecordingsPageModel : ObservableObject
     [ObservableProperty]
     private bool _isLoading;
 
-    public RecordingsPageModel(ISettingsProvider settingsProvider)
+    public RecordingsPageModel(IOptions<CameraRecorderSettings> options)
     {
-        _settingsProvider = settingsProvider;
+        _options = options;
     }
 
     [RelayCommand]
@@ -106,67 +106,68 @@ public partial class RecordingsPageModel : ObservableObject
         {
             IsLoading = true;
 
-            var settings = _settingsProvider.GetSettings();
+            var settings = _options.Value;
             var dir = settings.LocalRecordingsPath;
 #if ANDROID
 
-    Recordings = new ObservableCollection<VideoFileInfo>();
+            Recordings = new ObservableCollection<VideoFileInfo>();
 
-    if (OperatingSystem.IsAndroidVersionAtLeast(29))
-    {
-    var contentResolver = Platform.AppContext?.ContentResolver;
-    Android.Net.Uri collectionUri = Android.Provider.MediaStore.Video.Media.ExternalContentUri;
-    
-    // Какие колонки хотим получить
-    string[] projection = { Android.Provider.MediaStore.Video.Media.InterfaceConsts.Data,
+            if (OperatingSystem.IsAndroidVersionAtLeast(29))
+            {
+                var contentResolver = Platform.AppContext?.ContentResolver;
+                Android.Net.Uri collectionUri = Android.Provider.MediaStore.Video.Media.ExternalContentUri;
+
+                // Какие колонки хотим получить
+                string[] projection = { Android.Provider.MediaStore.Video.Media.InterfaceConsts.Data,
                             Android.Provider.MediaStore.Video.Media.InterfaceConsts.DisplayName,
-                            Android.Provider.MediaStore.Video.Media.InterfaceConsts.Size, 
+                            Android.Provider.MediaStore.Video.Media.InterfaceConsts.Size,
                             Android.Provider.MediaStore.Video.Media.InterfaceConsts.DateAdded
                             };
-    // Filter to only get videos from DCIM/Camera
-    string selection = Android.Provider.MediaStore.Video.Media.InterfaceConsts.RelativePath + " LIKE ?";
-    string[] selectionArgs = new string[]{ settings.LocalRecordingsPath + "%"};  
-    // Sort by date taken
-    string sortOrder = Android.Provider.MediaStore.Video.Media.InterfaceConsts.DateAdded + " DESC";
+                // Filter to only get videos from DCIM/Camera
+                string selection = Android.Provider.MediaStore.Video.Media.InterfaceConsts.RelativePath + " LIKE ?";
+                string[] selectionArgs = new string[] { settings.LocalRecordingsPath + "%" };
+                // Sort by date taken
+                string sortOrder = Android.Provider.MediaStore.Video.Media.InterfaceConsts.DateAdded + " DESC";
 
-    using var cursor = contentResolver?.Query(
-        collectionUri, 
-        projection, 
-        selection,
-        selectionArgs, sortOrder);
-    
-        if (cursor != null)
-        {
-            var dataColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.Data);
-            var titleColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.DisplayName);
-            var sizeColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.Size);
-            var dateTakenColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.DateAdded);
-            
-            while (cursor.MoveToNext())
-            {
-                var filePath = cursor.GetString(dataColumn);
-                var fileTitle = cursor.GetString(titleColumn);
-                var fileSize = cursor.GetLong(sizeColumn);
-                var fileDate = cursor.GetLong(dateTakenColumn);
+                using var cursor = contentResolver?.Query(
+                    collectionUri,
+                    projection,
+                    selection,
+                    selectionArgs, sortOrder);
 
-                if (fileSize > 0)
+                if (cursor != null)
                 {
-                   Recordings.Add(new VideoFileInfo
+                    var dataColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.Data);
+                    var titleColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.DisplayName);
+                    var sizeColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.Size);
+                    var dateTakenColumn = cursor.GetColumnIndexOrThrow(Android.Provider.MediaStore.Video.Media.InterfaceConsts.DateAdded);
+
+                    while (cursor.MoveToNext())
                     {
-                        FileName = fileTitle,
-                        FullPath = filePath,
-                        SizeBytes = fileSize,
-                        Created = DateTimeOffset.FromUnixTimeSeconds(fileDate).DateTime
-                        
-                    });
+                        var filePath = cursor.GetString(dataColumn);
+                        var fileTitle = cursor.GetString(titleColumn);
+                        var fileSize = cursor.GetLong(sizeColumn);
+                        var fileDate = cursor.GetLong(dateTakenColumn);
+
+                        if (fileSize > 0)
+                        {
+                            Recordings.Add(new VideoFileInfo
+                            {
+                                FileName = fileTitle,
+                                FullPath = filePath,
+                                SizeBytes = fileSize,
+                                Created = DateTimeOffset.FromUnixTimeSeconds(fileDate).DateTime
+
+                            });
+                        }
+                    }
                 }
             }
-        }
-    }
-    else {
-        DirectGetFiles(dir);
-    }
-    
+            else
+            {
+                DirectGetFiles(dir);
+            }
+
 
 #else
             DirectGetFiles(dir);

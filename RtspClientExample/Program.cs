@@ -1,11 +1,14 @@
 ﻿using CameraRecorder;
 using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SharpMP4.Common;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 
 namespace RtspClientExample
@@ -25,7 +28,8 @@ namespace RtspClientExample
             services.AddTransient<RtspRecorder>();
             services.AddTransient<RtspViewer>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
-            services.AddTransient<ISettingsProvider, StaticSettingsProvider>();
+            services.AddSingleton<StaticSettingsProvider>();
+            services.AddTransient(sp => Options.Create(sp.GetRequiredService<StaticSettingsProvider>().GetSettings()));
 
             services.AddTransient<IStorageSink, LocalFileSink_>();
             services.AddTransient<IStorageSink, FtpSink>();
@@ -45,12 +49,23 @@ namespace RtspClientExample
                     .AddFile($@"C:\temp\camera\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt");
             });
 
+            //var configuration = new ConfigurationBuilder()
+            //       .AddUserSecrets<Recorder>()
+            //       .Build();
+            //services.AddSingleton<IConfiguration>(configuration);
+            //services.AddOptions();
+            //services.Configure<CameraRecorderSettings>(configuration);
+
+
             // Строим провайдер
             var serviceProvider = services.BuildServiceProvider();
 
             // Получаем сервис
             var recorder = serviceProvider.GetRequiredService<RtspViewer>();
             logger = serviceProvider.GetRequiredService<ILogger<Recorder>>();
+
+            var settings = serviceProvider.GetService<IOptions<CameraRecorderSettings>>();
+
 
 
             string url = "rtsp://192.168.1.8:554/stream1";

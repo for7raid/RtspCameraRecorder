@@ -2,17 +2,17 @@
 using CameraRecorder.Settings;
 using H264Sharp;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CameraRecorder;
 
 public class RtspViewer
 {
     private readonly ILogger<RtspViewer> _logger;
-    private readonly CameraRecorderSettings _settings;
     private readonly H264Decoder _decoder;
     private readonly ILoggerFactory _loggerFactory;
     private readonly RTSPClient _client;
-    private readonly ISettingsProvider _settingsProvider;
+    private readonly IOptions<CameraRecorderSettings> _options;
     private readonly AdaptiveMotionDetector _detector;
     private const string ProfileH264 = "H264";
 
@@ -23,13 +23,12 @@ public class RtspViewer
         RTSPClient client,
         RingBufferVideoStorage bufferVideoStorage,
         RingBufferAudioStorage bufferAudioStorage,
-        ISettingsProvider settingsProvider)
+        IOptions<CameraRecorderSettings> options)
     {
         _loggerFactory = loggerFactory;
         _client = client;
-        _settingsProvider = settingsProvider;
+        _options = options;
         _logger = _loggerFactory.CreateLogger<RtspViewer>();
-        _settings = _settingsProvider.GetSettings();
 
         _decoder = new H264Decoder();
         _decoder.Initialize();
@@ -79,9 +78,9 @@ public class RtspViewer
     public void Start()
     {
         _client.Stop();
-        if (!string.IsNullOrWhiteSpace(_settings.RtspUrl))
+        if (!string.IsNullOrWhiteSpace(_options.Value.RtspUrl))
         {
-            _client.Connect("rtsp://192.168.1.8:554/stream2", _settings.RtspLogin, _settings.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+            _client.Connect("rtsp://192.168.1.8:554/stream2", _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
         }
     }
 }

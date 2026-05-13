@@ -1,7 +1,9 @@
 ﻿using CameraRecorder.MotionAnalyzers;
+using CameraRecorder.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Collections.ObjectModel;
 
 namespace CameraRecorder.App.PageModels
@@ -12,6 +14,7 @@ namespace CameraRecorder.App.PageModels
 
         private readonly RtspRecorder _rtspRecorder;
         private readonly RtspViewer _rtspViewer;
+        private readonly IOptions<CameraRecorderSettings> _options;
         [ObservableProperty]
         bool _isRecording;
 
@@ -35,11 +38,14 @@ namespace CameraRecorder.App.PageModels
         public MainPageModel(
             RtspRecorder rtspRecorder,
             RtspViewer rtspViewer,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IOptions<CameraRecorderSettings> options)
         {
 
             _rtspRecorder = rtspRecorder;
             _rtspViewer = rtspViewer;
+            _options = options;
+
             _rtspRecorder.RecordingStarted += () => IsRecording = true;
             _rtspRecorder.RecordingStopped += () => IsRecording = false;
             _rtspRecorder.RecordingDurationChanged += (duration) =>
@@ -102,19 +108,19 @@ namespace CameraRecorder.App.PageModels
         [RelayCommand]
         private void NavigatedTo()
         {
-            _rtspViewer.Start();
+            //_rtspViewer.Start();
         }
 
         [RelayCommand]
         private void NavigatedFrom()
         {
-            _rtspViewer.Stop();
+            //_rtspViewer.Stop();
         }
 
         [RelayCommand]
         private async Task Appearing()
         {
-
+            Log = _options.Value.PostMotionDurationSec.ToString();
         }
 
 
