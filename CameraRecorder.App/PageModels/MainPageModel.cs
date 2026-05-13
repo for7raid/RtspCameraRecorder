@@ -58,11 +58,10 @@ namespace CameraRecorder.App.PageModels
                 FrameBufferSize = 30,
 
                 // Ключевые параметры
-                ChangedBlocksRatioThreshold = 0.03,  // 1.5% (около 130 блоков)
-                BaseBrightnessThreshold = 12,         // Низкий порог для плохого освещения
+                ChangedBlocksRatioThreshold = 0.01,  // 1.5% (около 130 блоков)
+                SigmaThreshold = 2.5,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
 
-                // Адаптация
-                EnableAutoAdaptation = true,
+                // Фон
                 AdaptationSpeed = 0.12,
                 MinFramesBeforeDetection = 10,
                 StatsRecalculationPeriod = 30,
@@ -70,16 +69,16 @@ namespace CameraRecorder.App.PageModels
                 // Фильтры
                 UseAdaptiveBackground = true,
                 EnableSpikeFilter = true,
-                MinMotionDuration = 4,                // 2 кадра подряд для подтверждения
+                MinMotionDuration = 2,                // 2 кадра подряд для подтверждения
                 MaxGlobalBrightnessChange = 50
             };
 
             var detector = new AdaptiveMotionDetector(settings, loggerFactory.CreateLogger<AdaptiveMotionDetector>());
-
+            int counter = 0;
             rtspViewer.FrameReceived += async (rgbBytes) =>
             {
                 var result = detector.DetectMotion(rgbBytes);
-                Log = Log.Substring(Math.Max(0, Log.Length - 700)) + Environment.NewLine + result.ToString() + Environment.NewLine + detector.GetAdaptationStats();
+                Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
 
                 //Запускаем запись по движению, если сейчас нет записи вручную
                 //if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
@@ -95,18 +94,22 @@ namespace CameraRecorder.App.PageModels
                 //}
 
             };
-            _rtspViewer.Start();
+
         }
 
 
 
         [RelayCommand]
-        private void NavigatedTo() =>
-            _isNavigatedTo = true;
+        private void NavigatedTo()
+        {
+            _rtspViewer.Start();
+        }
 
         [RelayCommand]
-        private void NavigatedFrom() =>
-            _isNavigatedTo = false;
+        private void NavigatedFrom()
+        {
+            _rtspViewer.Stop();
+        }
 
         [RelayCommand]
         private async Task Appearing()

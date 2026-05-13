@@ -58,7 +58,7 @@ namespace CameraRecorder.App
                     .AddFilter("RtspClientExample", LogLevel.Debug)
                     .AddFilter("Rtsp", LogLevel.Debug)
                     .AddFilter("CameraRecorder.MotionAnalyzer_", LogLevel.Debug)
-                    .AddFile(Path.Combine(FileSystem.AppDataDirectory, "logs", $"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"));
+                    .AddFile(Path.Combine(FileSystem.AppDataDirectory, "logs", $"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}-{Environment.OSVersion}.txt"));
             });
 
 

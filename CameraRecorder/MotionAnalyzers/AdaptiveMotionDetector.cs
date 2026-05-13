@@ -31,10 +31,10 @@ public class MotionDetectorSettings
     public int FrameBufferSize { get; set; } = 30;
 
     /// <summary>
-    /// Базовый порог изменения средней освещённости блока (0-255)
-    /// Будет автоматически масштабироваться под уровень освещения
+    /// Множитель сигмы шума для порога (обычно 2.0-4.0)
+    /// Чем выше — тем меньше ложных срабатываний, но ниже чувствительность
     /// </summary>
-    public byte BaseBrightnessThreshold { get; set; } = 25;
+    public double SigmaThreshold { get; set; } = 2.5;
 
     /// <summary>
     /// Минимальный процент изменившихся блоков для детекции движения (0.0-1.0)
@@ -50,11 +50,6 @@ public class MotionDetectorSettings
     /// Высота изображения в пикселях
     /// </summary>
     public int Height { get; set; }
-
-    /// <summary>
-    /// Включить автоматическую адаптацию порогов
-    /// </summary>
-    public bool EnableAutoAdaptation { get; set; } = true;
 
     /// <summary>
     /// Скорость адаптации к изменению освещения (0-1, 0=медленно, 1=быстро)
@@ -114,11 +109,11 @@ public class LightingStats
     public double GlobalBrightness { get; set; }      // Средняя яркость всего кадра
     public double BrightnessStdDev { get; set; }      // Стандартное отклонение яркости
     public double NoiseLevel { get; set; }            // Оценка уровня шума
-    public byte AdaptiveThreshold { get; set; }       // Адаптивный порог для текущих условий
+    public double AdaptiveThreshold { get; set; }       // Адаптивный порог для текущих условий
 
     public override string ToString()
     {
-        return $"Global={GlobalBrightness:F1}, Noise={NoiseLevel:F1}, Threshold={AdaptiveThreshold}";
+        return $"Global={GlobalBrightness:F1}, Noise={NoiseLevel:F1}, BrightnessStdDev={BrightnessStdDev:F1}, Threshold={AdaptiveThreshold:F1}";
     }
 }
 
@@ -135,16 +130,16 @@ public class MotionDetectionResult
     public bool[] ChangedBlocksMap { get; set; }
     public double ProcessingTimeMs { get; set; }
     public LightingStats LightingStats { get; set; }
-    public byte CurrentThreshold { get; set; }
+    public double CurrentThreshold { get; set; }
     public bool IsAdapting { get; set; }
 
     public override string ToString()
     {
-        return $"Motion: {(HasMotion ? "YES" : "NO")}, " +
+        return $"Motion: {(HasMotion ? "YES" : " NO")}, " +
                $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:F2}%), " +
-               $"AverageChangeIntensity: {AverageChangeIntensity}, " +
-               $"Threshold: {CurrentThreshold}, " +
-               $"Lighting: {LightingStats?.GlobalBrightness:F1}";
+               $"AverageChangeIntensity: {AverageChangeIntensity:F1}, " +
+               //$"Threshold: {CurrentThreshold}, " +
+               $"Lighting: {LightingStats}";
     }
 }
 
@@ -164,10 +159,8 @@ public class AdaptiveMotionDetector
     private int _framesProcessed;
     private int _framesSinceLastStats;
     private LightingStats _currentLightingStats;
-    private byte _currentAdaptiveThreshold;
     private byte[] _adaptiveBackground;
     private readonly Queue<bool> _motionHistory;
-    private double _baselineNoiseLevel;
     private double _referenceGlobalBrightness;
 
     // Для фильтрации всплесков
@@ -190,14 +183,11 @@ public class AdaptiveMotionDetector
         _frameBuffer = new Queue<byte[]>();
         _globalBrightnessHistory = new Queue<double>();
         _motionHistory = new Queue<bool>();
-        _currentAdaptiveThreshold = settings.BaseBrightnessThreshold;
 
         _logger.LogWarning($"[AdaptiveMotionDetector] Инициализирован:");
         _logger.LogWarning($"  Размер: {settings.Width}x{settings.Height}");
         _logger.LogWarning($"  Блок: {settings.BlockSize}x{settings.BlockSize} -> {_blocksPerRow}x{_blocksPerCol} блоков");
         _logger.LogWarning($"  Буфер кадров: {settings.FrameBufferSize}");
-        _logger.LogWarning($"  Автоадаптация: {(settings.EnableAutoAdaptation ? "ВКЛ" : "ВЫКЛ")}");
-        _logger.LogWarning($"  Скорость адаптации: {settings.AdaptationSpeed}");
     }
 
     /// <summary>
@@ -304,20 +294,11 @@ public class AdaptiveMotionDetector
         var stats = new LightingStats();
 
         // Средняя яркость кадра
-        double totalBrightness = 0;
-        var allValues = new List<byte>(_totalBlocks);
-
-        for (int i = 0; i < _totalBlocks; i++)
-        {
-            byte val = brightnessMap[i];
-            totalBrightness += val;
-            allValues.Add(val);
-        }
-
+        double totalBrightness = brightnessMap.Sum(x => x);
         stats.GlobalBrightness = totalBrightness / _totalBlocks;
 
         // Стандартное отклонение (контрастность)
-        double variance = allValues.Select(v => Math.Pow(v - stats.GlobalBrightness, 2)).Average();
+        double variance = brightnessMap.Select(v => Math.Pow(v - stats.GlobalBrightness, 2)).Average();
         stats.BrightnessStdDev = Math.Sqrt(variance);
 
         // Оценка уровня шума (среднее абсолютное отклонение между соседними блоками)
@@ -335,34 +316,17 @@ public class AdaptiveMotionDetector
         }
         stats.NoiseLevel = noiseCount > 0 ? noiseSum / noiseCount : 0;
 
-        // Адаптивный порог: базовый порог * коэффициент освещения
-        double lightingFactor = 1.0;
-        if (_baselineNoiseLevel > 0)
-        {
-            // При высоком уровне шума (плохое освещение) повышаем порог
-            lightingFactor = Math.Max(1.0, stats.NoiseLevel / _baselineNoiseLevel);
-        }
+        // Сигма-модель: порог = k * уровень_шума
+        double newThreshold = _settings.SigmaThreshold * stats.NoiseLevel;
 
-        // При низкой контрастности тоже повышаем порог
+        // При низкой контрастности чуть повышаем порог (тяжело отличить сигнал от шума)
         if (stats.BrightnessStdDev < 15)
-        {
-            lightingFactor *= 1.3;
-        }
+            newThreshold *= 1.3;
 
-        byte newThreshold = (byte)Math.Min(255, _settings.BaseBrightnessThreshold * lightingFactor);
+        // Не даём порогу уйти в 0 или в бесконечность
+        newThreshold = Math.Clamp(newThreshold, 3.0, 200.0);
 
-        // Плавное изменение порога
-        if (_settings.EnableAutoAdaptation)
-        {
-            stats.AdaptiveThreshold = (byte)(_currentAdaptiveThreshold * (1 - _settings.AdaptationSpeed) + newThreshold * _settings.AdaptationSpeed);
-        }
-        else
-        {
-            stats.AdaptiveThreshold = _settings.BaseBrightnessThreshold;
-        }
-
-        _currentAdaptiveThreshold = stats.AdaptiveThreshold;
-        stats.AdaptiveThreshold = _currentAdaptiveThreshold;
+        stats.AdaptiveThreshold = newThreshold;
 
         return stats;
     }
@@ -404,14 +368,22 @@ public class AdaptiveMotionDetector
         if (_frameBuffer.Count < 3)
             return null;
 
-        // Медианный фильтр из буфера
         var frameList = _frameBuffer.ToList();
         var medianBackground = new byte[_totalBlocks];
+        var temp = new byte[frameList.Count];
+        int count = frameList.Count;
+        int mid = count / 2;
+        bool even = count % 2 == 0;
 
         for (int i = 0; i < _totalBlocks; i++)
         {
-            var values = frameList.Select(f => f[i]).OrderBy(v => v).ToList();
-            medianBackground[i] = values[values.Count / 2];
+            for (int j = 0; j < count; j++)
+                temp[j] = frameList[j][i];
+
+            Array.Sort(temp);
+            medianBackground[i] = even
+                ? (byte)((temp[mid - 1] + temp[mid]) / 2)
+                : temp[mid];
         }
 
         return medianBackground;
@@ -420,7 +392,7 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Сравнение двух карт яркости
     /// </summary>
-    private bool[] CompareBrightnessMaps(byte[] current, byte[] reference, byte threshold)
+    private bool[] CompareBrightnessMaps(byte[] current, byte[] reference, double threshold)
     {
         var changed = new bool[_totalBlocks];
 
@@ -441,11 +413,18 @@ public class AdaptiveMotionDetector
         if (_globalBrightnessHistory.Count < 10)
             return false;
 
-        double currentGlobal = _globalBrightnessHistory.Last();
-        double avgGlobal = _globalBrightnessHistory.Average();
+        if (_referenceGlobalBrightness == 0)
+        {
+            _referenceGlobalBrightness = _globalBrightnessHistory.Average();
+            return false;
+        }
 
-        // Если яркость сильно изменилась - это изменение освещения, а не движение
-        return Math.Abs(currentGlobal - avgGlobal) > _settings.MaxGlobalBrightnessChange;
+        double currentGlobal = _globalBrightnessHistory.Last();
+        double change = Math.Abs(currentGlobal - _referenceGlobalBrightness);
+
+        _referenceGlobalBrightness = _referenceGlobalBrightness * 0.995 + currentGlobal * 0.005;
+
+        return change > _settings.MaxGlobalBrightnessChange;
     }
 
     /// <summary>
@@ -490,11 +469,7 @@ public class AdaptiveMotionDetector
             _currentLightingStats = CalculateLightingStats(brightnessMap);
             _framesSinceLastStats = 0;
 
-            // Инициализация базового уровня шума
-            if (_baselineNoiseLevel == 0 && _framesProcessed > 30)
-            {
-                _baselineNoiseLevel = _currentLightingStats.NoiseLevel;
-            }
+
         }
     }
 
@@ -546,7 +521,7 @@ public class AdaptiveMotionDetector
             result.HasMotion = false;
             result.IsAdapting = true;
             result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-            result.CurrentThreshold = _currentAdaptiveThreshold;
+            result.CurrentThreshold = _currentLightingStats?.AdaptiveThreshold ?? 25.0;
             return result;
         }
 
@@ -567,15 +542,17 @@ public class AdaptiveMotionDetector
         {
             // При изменении освещения ускоряем адаптацию фона
             UpdateAdaptiveBackground(currentMap);
+            _currentLightingStats = CalculateLightingStats(currentMap);
+            _framesSinceLastStats = 0;
             result.IsAdapting = true;
             result.HasMotion = false;
             result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-            result.CurrentThreshold = _currentAdaptiveThreshold;
+            result.CurrentThreshold = _currentLightingStats.AdaptiveThreshold;
             return result;
         }
 
         // Получаем актуальный порог
-        byte threshold = _currentLightingStats?.AdaptiveThreshold ?? _currentAdaptiveThreshold;
+        double threshold = _currentLightingStats?.AdaptiveThreshold ?? 25.0;
 
         // Сравниваем с фоном
         var changedMap = CompareBrightnessMaps(currentMap, background, threshold);
@@ -640,7 +617,7 @@ public class AdaptiveMotionDetector
         _framesSinceLastStats = 0;
         _consecutiveMotionFrames = 0;
         _consecutiveNoMotionFrames = 0;
-        _currentAdaptiveThreshold = _settings.BaseBrightnessThreshold;
+        _referenceGlobalBrightness = 0;
         _logger.LogWarning("[AdaptiveMotionDetector] Сброшен");
     }
 
@@ -649,9 +626,10 @@ public class AdaptiveMotionDetector
     /// </summary>
     public string GetAdaptationStats()
     {
+        var stats = _currentLightingStats;
         return $"Кадров: {_framesProcessed}, " +
-               $"Порог: {_currentAdaptiveThreshold}, " +
-               $"Буфер: {_frameBuffer.Count}/{_settings.FrameBufferSize}, " +
-               $"Шум: {_baselineNoiseLevel:F2}";
+               $"Сигма: {_settings.SigmaThreshold:F1}, " +
+               $"Шум: {stats?.NoiseLevel ?? 0:F2}, " +
+               $"Порог: {stats?.AdaptiveThreshold ?? 0:F1}";
     }
 }

@@ -1,12 +1,7 @@
 ﻿using CameraRecorder.MotionAnalyzers;
 using CameraRecorder.Settings;
 using H264Sharp;
-using H264SharpBitmapExtentions;
 using Microsoft.Extensions.Logging;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
-using System.Text;
 
 namespace CameraRecorder;
 
