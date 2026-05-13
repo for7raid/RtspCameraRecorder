@@ -8,10 +8,10 @@ public interface IStorageSink
     string Name { get; }
 
     /// <summary>
-    /// Сохранить файл. Позиция stream будет установлена в 0 перед вызовом.
+    /// Сохранить файл.
     /// </summary>
     /// <param name="fileName">Имя файла (без пути)</param>
-    /// <param name="stream">Поток с данными</param>
+    /// <param name="data">Данные файла</param>
     /// <param name="ct">Токен отмены</param>
-    Task SaveAsync(string fileName, Stream stream, CancellationToken ct);
+    void SaveAsync(string fileName, byte[] data, CancellationToken ct);
 }

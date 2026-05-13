@@ -16,7 +16,7 @@ public class RtspViewer
     private readonly AdaptiveMotionDetector _detector;
     private const string ProfileH264 = "H264";
 
-    public event Action<byte[]>? FrameReceived;
+    public event Action<byte[], ulong>? FrameReceived;
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
 
     public RtspViewer(ILoggerFactory loggerFactory,
@@ -41,7 +41,7 @@ public class RtspViewer
             _client.Play();
         };
 
-       
+
 
     }
 
@@ -51,8 +51,9 @@ public class RtspViewer
     }
 
 
-    
 
+
+    RgbImage rgbOut = new RgbImage(H264Sharp.ImageFormat.Rgb, 640, 480);
     void ReceivedVideoData_H264(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
         foreach (var nalUnitMem in dataArgs.Data)
@@ -62,12 +63,17 @@ public class RtspViewer
             {
                 var nal_unit_type = (NalUnitType)(nalUnit[4] & 0x1F);
                 var unit = nalUnitMem.Slice(5);
+                DecodingState ds;
 
-                RgbImage rgbOut = new RgbImage(H264Sharp.ImageFormat.Rgb, 640, 480);
-                if (_decoder.Decode(nalUnitMem.ToArray(), 0, nalUnit.Length, noDelay: true, out DecodingState ds, ref rgbOut) && ds == DecodingState.dsErrorFree)
+                var dec = _decoder.Decode(nalUnitMem.ToArray(), 0, nalUnit.Length, noDelay: true, out ds, ref rgbOut);
+                if (dec && ds == DecodingState.dsErrorFree)
                 {
 
-                    FrameReceived?.Invoke(rgbOut.GetBytes());
+                    FrameReceived?.Invoke(rgbOut.GetBytes(), dataArgs.RtpTimestamp);
+
+                }
+                else
+                {
 
                 }
 

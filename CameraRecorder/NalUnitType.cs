@@ -7,6 +7,7 @@ public enum NalUnitType: int
     // H.264
     H264_NonIDR_H265_TRAIL_R = 1,
     H264_IDR = 5,
+    H264_SEI = 6,
     H264_SPS = 7,
     H264_PPS = 8,
     // H.265

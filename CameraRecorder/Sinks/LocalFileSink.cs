@@ -17,7 +17,7 @@ public sealed class LocalFileSink_ : IStorageSink
         _logger = logger;
     }
 
-    public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
+    public async void SaveAsync(string fileName, byte[] data, CancellationToken ct)
     {
         var _settings = _options.Value;
         if (!_settings.LocalStorageEnabled)
@@ -32,35 +32,9 @@ public sealed class LocalFileSink_ : IStorageSink
             return;
         }
 
-        stream.Position = 0;
+        using var stream = new MemoryStream(data);
 
-#if ANDROID
-var context = Platform.CurrentActivity;
 
-    if (OperatingSystem.IsAndroidVersionAtLeast(29))
-    {
-        Android.Content.ContentResolver resolver = context.ContentResolver;
-        Android.Content.ContentValues contentValues = new();
-        contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
-        contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "video/mp4");
-        contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, _settings.LocalRecordingsPath);
-        Android.Net.Uri imageUri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, contentValues);
-           
-        var os = resolver.OpenOutputStream(imageUri);
-        await stream.CopyToAsync(os);
-        os.Flush();
-        os.Close();
-        _logger.LogInformation("Файл сохранён локально: {Path}", imageUri);
-    }
-    else
-    {
-        Java.IO.File storagePath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryPictures);
-        string path = System.IO.Path.Combine(storagePath.ToString(), "image.png");
-       
-    }
-
-#endif
-#if WINDOWS
         var fullPath = Path.Combine(_settings.LocalRecordingsPath, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
@@ -68,7 +42,6 @@ var context = Platform.CurrentActivity;
             bufferSize: 81920, useAsync: true);
         await stream.CopyToAsync(fs, ct);
         _logger.LogInformation("Файл сохранён локально: {Path}", fullPath);
-#endif
 
     }
 }

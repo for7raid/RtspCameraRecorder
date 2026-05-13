@@ -10,8 +10,6 @@ namespace CameraRecorder.App.PageModels
 {
     public partial class MainPageModel : ObservableObject
     {
-        private bool _isNavigatedTo;
-
         private readonly RtspRecorder _rtspRecorder;
         private readonly RtspViewer _rtspViewer;
         private readonly IOptions<CameraRecorderSettings> _options;
@@ -19,10 +17,10 @@ namespace CameraRecorder.App.PageModels
         bool _isRecording;
 
         [ObservableProperty]
-        TimeSpan _recordDuration;
+        TimeSpan _recordDuration = TimeSpan.Zero;
 
         [ObservableProperty]
-        string _recordDurationText;
+        string _recordDurationText = string.Empty;
 
         [ObservableProperty]
         private string _today = DateTime.Now.ToString("dddd, MMM d");
@@ -81,10 +79,10 @@ namespace CameraRecorder.App.PageModels
 
             var detector = new AdaptiveMotionDetector(settings, loggerFactory.CreateLogger<AdaptiveMotionDetector>());
             int counter = 0;
-            rtspViewer.FrameReceived += async (rgbBytes) =>
+            rtspViewer.FrameReceived += async (rgbBytes, RtpTimestamp) =>
             {
-                var result = detector.DetectMotion(rgbBytes);
-                //Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
+                var result = detector.DetectMotion(rgbBytes, RtpTimestamp);
+                Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
 
                 //Запускаем запись по движению, если сейчас нет записи вручную
                 if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
@@ -98,7 +96,6 @@ namespace CameraRecorder.App.PageModels
                     await _rtspRecorder.StopRecordAsync();
                     _lastMotionTime = null;
                 }
-
             };
 
         }

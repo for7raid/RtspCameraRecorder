@@ -49,7 +49,7 @@ namespace CameraRecorder.App
             builder.Services.AddTransient<RtspViewer>();
             builder.Services.AddTransient<IMp4Logger, Mp4Logger>();
 
-            builder.Services.AddTransient<IStorageSink, LocalFileSink>();
+            builder.Services.AddTransient<IStorageSink, Sinks.LocalFileSink>();
             builder.Services.AddTransient<IStorageSink, FtpSink>();
 
             builder.Services.AddLogging(builder =>

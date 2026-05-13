@@ -115,7 +115,7 @@ public partial class RecordingsPageModel : ObservableObject
             if (OperatingSystem.IsAndroidVersionAtLeast(29))
             {
                 var contentResolver = Platform.AppContext?.ContentResolver;
-                Android.Net.Uri collectionUri = Android.Provider.MediaStore.Video.Media.ExternalContentUri;
+                var collectionUri = Android.Provider.MediaStore.Video.Media.ExternalContentUri;
 
                 // Какие колонки хотим получить
                 string[] projection = { Android.Provider.MediaStore.Video.Media.InterfaceConsts.Data,
@@ -149,11 +149,11 @@ public partial class RecordingsPageModel : ObservableObject
                         var fileSize = cursor.GetLong(sizeColumn);
                         var fileDate = cursor.GetLong(dateTakenColumn);
 
-                        if (fileSize > 0)
+                        if (!string.IsNullOrEmpty(filePath) && fileSize > 0)
                         {
                             Recordings.Add(new VideoFileInfo
                             {
-                                FileName = fileTitle,
+                                FileName = fileTitle!,
                                 FullPath = filePath,
                                 SizeBytes = fileSize,
                                 Created = DateTimeOffset.FromUnixTimeSeconds(fileDate).DateTime

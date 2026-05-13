@@ -18,7 +18,7 @@ public sealed class FtpSink : IStorageSink
         _logger = logger;
     }
 
-    public async Task SaveAsync(string fileName, Stream stream, CancellationToken ct)
+    public async void SaveAsync(string fileName, byte[] data, CancellationToken ct)
     {
         var settings = _options.Value;
         if (!settings.FtpEnabled)
@@ -53,7 +53,7 @@ public sealed class FtpSink : IStorageSink
             // Отмена через токен
             using var ctr = ct.Register(() => request.Abort());
 
-            stream.Position = 0;
+            using var stream = new MemoryStream(data);
             using var requestStream = await request.GetRequestStreamAsync();
             await stream.CopyToAsync(requestStream, ct);
 

@@ -54,6 +54,7 @@ public class RingBufferAudioStorage
 
     public void StartRecord()
     {
+        if (_isRecording) return;
         _isRecording = true;
         _buffer.TryPeek(out var oldestFrame);
         _logger.LogInformation($"Start audio recodring {DateTime.Now:yyyy-MM-dd HH:mm:ss}, firts frame {oldestFrame?.Timestamp::yyyy-MM-dd HH:mm:ss}, duration {_currentBufferDurationMs}, frames count {_buffer.Count}");
@@ -95,18 +96,10 @@ public class RingBufferAudioStorage
             wavStream.Write(bytes);
         }
 
-        // Раздаём всем sink-ам
+        // Раздаём всем sink-ам (fire-and-forget, каждый получает byte[])
+        var fileData = wavStream.ToArray();
         foreach (var sink in _sinks)
-        {
-            try
-            {
-                await sink.SaveAsync(fileName, wavStream, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка сохранения аудио в {SinkName}", sink.Name);
-            }
-        }
+            sink.SaveAsync(fileName, fileData, CancellationToken.None);
     }
 
     public static byte[] BuildWavHeader(int dataSize, int sampleRate = 8000, short channels = 1, short bitsPerSample = 16)

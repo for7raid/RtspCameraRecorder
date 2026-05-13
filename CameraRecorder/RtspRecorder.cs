@@ -80,12 +80,11 @@ public class RtspRecorder
 
     public void StartRecord()
     {
-        _bufferVideoStorage.StartRecord();
-        _bufferAudioStorage.StartRecord();
-
         if (!_isRecording)
         {
             _isRecording = true;
+            _bufferVideoStorage.StartRecord();
+            _bufferAudioStorage.StartRecord();
             _logger.LogInformation("Запись началась");
             RecordingStarted?.Invoke();
         }
@@ -93,13 +92,11 @@ public class RtspRecorder
 
     public async Task StopRecordAsync()
     {
-
-        await _bufferVideoStorage.StopRecordAsync();
-        await _bufferAudioStorage.StopRecordAsync();
-
         if (_isRecording)
         {
             _isRecording = false;
+            await _bufferVideoStorage.StopRecordAsync();
+            await _bufferAudioStorage.StopRecordAsync();
             _logger.LogInformation("Запись остановлена");
             RecordingStopped?.Invoke();
             RecordingDurationChanged?.Invoke(TimeSpan.Zero);
@@ -141,19 +138,6 @@ public class RtspRecorder
                 _bufferVideoStorage.AddFrame(unit, nal_unit_type);
 
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
-
-                ////Запускаем запись по движению, если сейчас нет записи вручную
-                //if ((!_isRecording || _lastMotionTime.HasValue) && _motionAnalyzer.Append(unit.ToArray()))
-                //{
-                //    StartRecord();
-                //    _lastMotionTime = DateTime.Now;
-                //}
-
-                if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
-                {
-                    await StopRecordAsync();
-                    _lastMotionTime = null;
-                }
 
                 if (_isRecording)
                 {

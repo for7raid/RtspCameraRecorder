@@ -69,6 +69,7 @@ public class RingBufferVideoStorage
 
     public void StartRecord()
     {
+        if (_isRecording) return;
         _isRecording = true;
         _buffer.TryPeek(out var oldestFrame);
         _logger.LogInformation($"Start video recodring {DateTime.Now:yyyy-MM-dd HH:mm:ss}, firts frame {oldestFrame?.Timestamp::yyyy-MM-dd HH:mm:ss}, duration {_currentBufferDurationMs}, frames count {_buffer.Count}");
@@ -116,17 +117,9 @@ public class RingBufferVideoStorage
 
         mp4Builder.FinalizeMedia();
 
-        // Раздаём всем sink-ам
+        // Раздаём всем sink-ам (fire-and-forget, каждый получает byte[])
+        var fileData = mp4Stream.ToArray();
         foreach (var sink in _sinks)
-        {
-            try
-            {
-                await sink.SaveAsync(fileName, mp4Stream, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка сохранения в {SinkName}", sink.Name);
-            }
-        }
+            sink.SaveAsync(fileName, fileData, CancellationToken.None);
     }
 }
