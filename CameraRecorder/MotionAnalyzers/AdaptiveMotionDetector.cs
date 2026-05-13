@@ -129,6 +129,7 @@ public class MotionDetectionResult
     public LightingStats LightingStats { get; set; }
     public double CurrentThreshold { get; set; }
     public bool IsAdapting { get; set; }
+    public ulong RtpTimestamp { get; internal set; }
 
     public override string ToString()
     {
@@ -160,6 +161,10 @@ public class AdaptiveMotionDetector
     private double _referenceGlobalBrightness;
     private double _brightnessSum;
 
+    // ── Стратегия извлечения яркости (выбирается один раз) ──
+    private readonly Func<byte[], int, byte> _getBrightness;
+    private readonly int _bytesPerPixel;
+
     // Для фильтрации всплесков
     private int _consecutiveMotionFrames;
     private int _consecutiveNoMotionFrames;
@@ -178,6 +183,15 @@ public class AdaptiveMotionDetector
         _totalBlocks = _blocksPerCol * _blocksPerRow;
 
         _frameBuffer = new Queue<byte[]>();
+        _getBrightness = settings.PixelFormat switch
+        {
+            PixelFormat.Y => static (data, i) => data[i],
+            PixelFormat.RGB => RgbBrightness,
+            PixelFormat.RGBA => RgbBrightness,
+            PixelFormat.BGR => BgrBrightness,
+            PixelFormat.BGRA => BgrBrightness,
+            _ => throw new NotSupportedException($"Формат {settings.PixelFormat} не поддерживается")
+        };
         _globalBrightnessHistory = new Queue<double>();
 
         _logger.LogWarning($"[AdaptiveMotionDetector] Инициализирован:");
@@ -186,74 +200,35 @@ public class AdaptiveMotionDetector
         _logger.LogWarning($"  Буфер кадров: {settings.FrameBufferSize}");
     }
 
+    // ── Статические хелперы яркости (JIT встроит) ──
+    private static byte RgbBrightness(byte[] d, int i) =>
+        (byte)((299 * d[i] + 587 * d[i + 1] + 114 * d[i + 2]) / 1000);
+
+    private static byte BgrBrightness(byte[] d, int i) =>
+        (byte)((299 * d[i + 2] + 587 * d[i + 1] + 114 * d[i]) / 1000);
     /// <summary>
-    /// Извлечение средней яркости блока из RGBA данных
+    /// Извлечение средней яркости блока (switch вынесен в конструктор)
     /// </summary>
     private byte GetBlockAverageBrightness(byte[] imageData, int blockRow, int blockCol)
     {
         int startX = blockCol * _settings.BlockSize;
         int startY = blockRow * _settings.BlockSize;
+        int sum = 0, count = 0;
+        int w = _settings.Width, h = _settings.Height, blockSize = _settings.BlockSize;
 
-        int bytesPerPixel = GetBytesPerPixel(_settings.PixelFormat);
-        int sum = 0;
-        int pixelCount = 0;
-
-        for (int y = 0; y < _settings.BlockSize && startY + y < _settings.Height; y++)
+        for (int y = 0; y < blockSize && startY + y < h; y++)
         {
-            for (int x = 0; x < _settings.BlockSize && startX + x < _settings.Width; x++)
+            int rowOff = (startY + y) * w;
+            for (int x = 0; x < blockSize && startX + x < w; x++)
             {
-                int pixelIndex = ((startY + y) * _settings.Width + (startX + x)) * bytesPerPixel;
-
-                byte brightness;
-
-                switch (_settings.PixelFormat)
-                {
-                    case PixelFormat.Y:
-                        brightness = imageData[pixelIndex];
-                        break;
-
-                    case PixelFormat.RGB:
-                        byte r = imageData[pixelIndex];
-                        byte g = imageData[pixelIndex + 1];
-                        byte b = imageData[pixelIndex + 2];
-                        brightness = (byte)((299 * r + 587 * g + 114 * b) / 1000);
-                        break;
-
-                    case PixelFormat.BGR:
-                        byte bBgr = imageData[pixelIndex];
-                        byte gBgr = imageData[pixelIndex + 1];
-                        byte rBgr = imageData[pixelIndex + 2];
-                        brightness = (byte)((299 * rBgr + 587 * gBgr + 114 * bBgr) / 1000);
-                        break;
-
-                    case PixelFormat.RGBA:
-                        r = imageData[pixelIndex];
-                        g = imageData[pixelIndex + 1];
-                        b = imageData[pixelIndex + 2];
-                        // альфа игнорируется
-                        brightness = (byte)((299 * r + 587 * g + 114 * b) / 1000);
-                        break;
-
-                    case PixelFormat.BGRA:
-                        b = imageData[pixelIndex];
-                        g = imageData[pixelIndex + 1];
-                        r = imageData[pixelIndex + 2];
-                        brightness = (byte)((299 * r + 587 * g + 114 * b) / 1000);
-                        break;
-
-                    default:
-                        throw new NotSupportedException($"Формат {_settings.PixelFormat} не поддерживается");
-                }
-
-                sum += brightness;
-                pixelCount++;
+                sum += _getBrightness(imageData, (rowOff + startX + x) * _bytesPerPixel);
+                count++;
             }
         }
-
-        return (byte)(pixelCount > 0 ? sum / pixelCount : 0);
+        return (byte)(count > 0 ? sum / count : 0);
     }
 
-    private int GetBytesPerPixel(PixelFormat format)
+    private static int GetBytesPerPixel(PixelFormat format)
     {
         return format switch
         {
@@ -480,10 +455,10 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Основной метод детекции движения
     /// </summary>
-    public MotionDetectionResult DetectMotion(byte[] rgbaData)
+    public MotionDetectionResult DetectMotion(byte[] rgbaData, ulong RtpTimestamp)
     {
         var startTime = DateTime.Now;
-        var result = new MotionDetectionResult();
+        var result = new MotionDetectionResult() { RtpTimestamp = RtpTimestamp };
 
         int bytesPerPixel = GetBytesPerPixel(_settings.PixelFormat);
 
