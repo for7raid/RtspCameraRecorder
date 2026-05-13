@@ -84,20 +84,20 @@ namespace CameraRecorder.App.PageModels
             rtspViewer.FrameReceived += async (rgbBytes) =>
             {
                 var result = detector.DetectMotion(rgbBytes);
-                Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
+                //Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
 
                 //Запускаем запись по движению, если сейчас нет записи вручную
-                //if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
-                //{
-                //    _rtspRecorder.StartRecord();
-                //    _lastMotionTime = DateTime.Now;
+                if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
+                {
+                    _rtspRecorder.StartRecord();
+                    _lastMotionTime = DateTime.Now;
 
-                //}
-                //if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > 10) //TODO Заменить на настройку
-                //{
-                //    await _rtspRecorder.StopRecordAsync();
-                //    _lastMotionTime = null;
-                //}
+                }
+                if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
+                {
+                    await _rtspRecorder.StopRecordAsync();
+                    _lastMotionTime = null;
+                }
 
             };
 
@@ -108,19 +108,19 @@ namespace CameraRecorder.App.PageModels
         [RelayCommand]
         private void NavigatedTo()
         {
-            //_rtspViewer.Start();
+            _rtspViewer.Start();
         }
 
         [RelayCommand]
         private void NavigatedFrom()
         {
-            //_rtspViewer.Stop();
+            _rtspViewer.Stop();
         }
 
         [RelayCommand]
         private async Task Appearing()
         {
-            Log = _options.Value.PostMotionDurationSec.ToString();
+
         }
 
 

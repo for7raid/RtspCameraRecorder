@@ -1,7 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace CameraRecorder.MotionAnalyzers;
 
@@ -160,8 +157,8 @@ public class AdaptiveMotionDetector
     private int _framesSinceLastStats;
     private LightingStats _currentLightingStats;
     private byte[] _adaptiveBackground;
-    private readonly Queue<bool> _motionHistory;
     private double _referenceGlobalBrightness;
+    private double _brightnessSum;
 
     // Для фильтрации всплесков
     private int _consecutiveMotionFrames;
@@ -182,7 +179,6 @@ public class AdaptiveMotionDetector
 
         _frameBuffer = new Queue<byte[]>();
         _globalBrightnessHistory = new Queue<double>();
-        _motionHistory = new Queue<bool>();
 
         _logger.LogWarning($"[AdaptiveMotionDetector] Инициализирован:");
         _logger.LogWarning($"  Размер: {settings.Width}x{settings.Height}");
@@ -294,11 +290,19 @@ public class AdaptiveMotionDetector
         var stats = new LightingStats();
 
         // Средняя яркость кадра
-        double totalBrightness = brightnessMap.Sum(x => x);
+        double totalBrightness = 0;
+        for (int i = 0; i < _totalBlocks; i++)
+            totalBrightness += brightnessMap[i];
         stats.GlobalBrightness = totalBrightness / _totalBlocks;
 
         // Стандартное отклонение (контрастность)
-        double variance = brightnessMap.Select(v => Math.Pow(v - stats.GlobalBrightness, 2)).Average();
+        double variance = 0;
+        for (int i = 0; i < _totalBlocks; i++)
+        {
+            double d = brightnessMap[i] - stats.GlobalBrightness;
+            variance += d * d;
+        }
+        variance /= _totalBlocks;
         stats.BrightnessStdDev = Math.Sqrt(variance);
 
         // Оценка уровня шума (среднее абсолютное отклонение между соседними блоками)
@@ -415,7 +419,7 @@ public class AdaptiveMotionDetector
 
         if (_referenceGlobalBrightness == 0)
         {
-            _referenceGlobalBrightness = _globalBrightnessHistory.Average();
+            _referenceGlobalBrightness = _brightnessSum / _globalBrightnessHistory.Count;
             return false;
         }
 
@@ -495,13 +499,18 @@ public class AdaptiveMotionDetector
         var currentMap = GetBlockBrightnessMap(rgbaData);
 
         // Обновляем историю глобальной яркости
-        long sum = currentMap.Sum(x => x);
+        long sum = 0;
+        for (int i = 0; i < _totalBlocks; i++)
+            sum += currentMap[i];
         double globalBrightness = (double)sum / _totalBlocks;
 
+        _brightnessSum += globalBrightness;
         _globalBrightnessHistory.Enqueue(globalBrightness);
 
         while (_globalBrightnessHistory.Count > 100)
-            _globalBrightnessHistory.Dequeue();
+        {
+            _brightnessSum -= _globalBrightnessHistory.Dequeue();
+        }
 
 
 
@@ -558,7 +567,9 @@ public class AdaptiveMotionDetector
         var changedMap = CompareBrightnessMaps(currentMap, background, threshold);
 
         // Подсчитываем изменения
-        int changedCount = changedMap.Count(x => x);
+        int changedCount = 0;
+        for (int i = 0; i < _totalBlocks; i++)
+            if (changedMap[i]) changedCount++;
         double changedPercent = (double)changedCount / _totalBlocks * 100;
 
         // Вычисляем интенсивность изменений
@@ -610,7 +621,6 @@ public class AdaptiveMotionDetector
     {
         _frameBuffer.Clear();
         _globalBrightnessHistory.Clear();
-        _motionHistory.Clear();
         _adaptiveBackground = null;
         _currentLightingStats = null;
         _framesProcessed = 0;
@@ -618,6 +628,7 @@ public class AdaptiveMotionDetector
         _consecutiveMotionFrames = 0;
         _consecutiveNoMotionFrames = 0;
         _referenceGlobalBrightness = 0;
+        _brightnessSum = 0;
         _logger.LogWarning("[AdaptiveMotionDetector] Сброшен");
     }
 
