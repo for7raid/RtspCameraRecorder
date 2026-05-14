@@ -124,7 +124,7 @@ public class MotionDetectionResult
     public override string ToString()
     {
         return $"Motion: {(HasMotion ? "YES" : " NO")}, " +
-               $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:F2}%), " +
+               $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:P2}), " +
                $"AverageChangeIntensity: {AverageChangeIntensity:F1}, " +
                //$"Threshold: {CurrentThreshold}, " +
                $"Lighting: {LightingStats}";
@@ -329,17 +329,27 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Сравнение двух карт яркости
     /// </summary>
-    private bool[] CompareBrightnessMaps(byte[] current, byte[] reference, double threshold)
+    private (bool[] map, int changedCount, double changedRatio, double avgChangeIntensity) CompareBrightnessMaps(byte[] current, byte[] reference, double threshold)
     {
         var changed = new bool[_totalBlocks];
+        long totalDiff = 0;
+        int changedCount = 0;
 
         for (int i = 0; i < _totalBlocks; i++)
         {
             int diff = Math.Abs(current[i] - reference[i]);
-            changed[i] = diff >= threshold;
+            if (diff >= threshold)
+            {
+                changed[i] = true;
+                totalDiff += diff;
+                changedCount++;
+            }
         }
 
-        return changed;
+        var avgChangeIntensity = changedCount > 0 ? (double)totalDiff / changedCount : 0;
+        double changedRatio = (double)changedCount / _totalBlocks;
+
+        return (changed, changedCount, changedRatio, avgChangeIntensity);
     }
 
     /// <summary>
@@ -388,24 +398,30 @@ public class AdaptiveMotionDetector
             while (_statsHistory.Count > 10)
                 _statsHistory.Dequeue();
 
+            var array = _statsHistory.ToArray();
             _currentLightingStats = new LightingStats
             {
-                GlobalBrightness = Median(_statsHistory.Select(s => s.GlobalBrightness)),
-                BrightnessStdDev = Median(_statsHistory.Select(s => s.BrightnessStdDev)),
-                NoiseLevel = Median(_statsHistory.Select(s => s.NoiseLevel)),
-                AdaptiveThreshold = Median(_statsHistory.Select(s => s.AdaptiveThreshold)),
+                GlobalBrightness = Median(array, s => s.GlobalBrightness),
+                BrightnessStdDev = Median(array, s => s.BrightnessStdDev),
+                NoiseLevel = Median(array, s => s.NoiseLevel),
+                AdaptiveThreshold = Median(array, s => s.AdaptiveThreshold),
             };
             _framesSinceLastStats = 0;
         }
     }
 
-    private static double Median(IEnumerable<double> values)
+    private static double Median(LightingStats[] _statsHistory, Func<LightingStats, double> getter)
     {
-        var sorted = values.OrderBy(v => v).ToList();
-        int mid = sorted.Count / 2;
-        return sorted.Count % 2 == 0
-            ? (sorted[mid - 1] + sorted[mid]) / 2.0
-            : sorted[mid];
+        var values = new double[_statsHistory.Length];
+        for (int i = 0; i < _statsHistory.Length; i++)
+        {
+            values[i] = getter(_statsHistory[i]);
+        }
+        Array.Sort(values);
+        int mid = values.Length / 2;
+        return values.Length % 2 == 0
+            ? (values[mid - 1] + values[mid]) / 2.0
+            : values[mid];
     }
 
     /// <summary>
@@ -463,44 +479,23 @@ public class AdaptiveMotionDetector
         // Сравниваем с фоном
         var changedMap = CompareBrightnessMaps(currentMap, background, threshold);
 
-        // Подсчитываем изменения
-        int changedCount = 0;
-        for (int i = 0; i < _totalBlocks; i++)
-            if (changedMap[i]) changedCount++;
-        double changedPercent = (double)changedCount / _totalBlocks * 100;
-
-        // Вычисляем интенсивность изменений
-        double avgChangeIntensity = 0;
-        long totalDiff = 0;
-        int diffCount = 0;
-        for (int i = 0; i < _totalBlocks; i++)
-        {
-            int diff = Math.Abs(currentMap[i] - background[i]);
-            if (diff >= threshold)
-            {
-                totalDiff += diff;
-                diffCount++;
-            }
-        }
-        avgChangeIntensity = diffCount > 0 ? (double)totalDiff / diffCount : 0;
-
         // Определяем наличие движения
-        bool rawMotion = (changedPercent / 100.0) >= _settings.ChangedBlocksRatioThreshold;
+        bool rawMotion = changedMap.changedRatio >= _settings.ChangedBlocksRatioThreshold;
         bool filteredMotion = FilterSpikes(rawMotion);
 
         // Заполняем результат
         result.HasMotion = filteredMotion;
-        result.ChangedBlocksCount = changedCount;
-        result.ChangedBlocksPercent = changedPercent;
+        result.ChangedBlocksCount = changedMap.changedCount;
+        result.ChangedBlocksPercent = changedMap.changedRatio;
         result.TotalBlocksCount = _totalBlocks;
-        result.ChangedBlocksMap = changedMap;
-        result.AverageChangeIntensity = avgChangeIntensity;
+        result.ChangedBlocksMap = changedMap.map;
+        result.AverageChangeIntensity = changedMap.avgChangeIntensity;
         result.LightingStats = _currentLightingStats;
         result.CurrentThreshold = threshold;
         result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
         result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
 
-        _logger.LogInformation(result.ToString());
+        _logger.LogDebug(result.ToString());
 
         return result;
     }

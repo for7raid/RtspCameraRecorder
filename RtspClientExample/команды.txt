@@ -1,0 +1,10 @@
+﻿Настройка приложения
+
+cd /opt
+sudo mkdir camerarec
+sudo chmod 777 camerarec
+
+
+pscp -pw 123456 "C:\Users\for7r\source\repos\CameraRecorder\RtspClientExample\bin\Release\net10.0\linux-arm64\*" pi@192.168.1.37:/opt/camerarec/
+cd /opt/camerarec/
+sudo chmod +x RtspClientExample

@@ -70,7 +70,7 @@ namespace CameraRecorder.App.PageModels
 
                 // Фильтры
                 EnableSpikeFilter = true,
-                MinMotionDuration = 2,                // 2 кадра подряд для подтверждения
+                MinMotionDuration = 4,                // 2 кадра подряд для подтверждения
                 MaxGlobalBrightnessChange = 50
             };
 
@@ -79,20 +79,21 @@ namespace CameraRecorder.App.PageModels
             rtspViewer.FrameReceived += async (rgbBytes, RtpTimestamp) =>
             {
                 var result = detector.DetectMotion(rgbBytes, RtpTimestamp);
-                Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
+                //Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
+                _isRecording = result.HasMotion;
 
-                //Запускаем запись по движению, если сейчас нет записи вручную
-                if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
-                {
-                    _rtspRecorder.StartRecord();
-                    _lastMotionTime = DateTime.Now;
+                ////Запускаем запись по движению, если сейчас нет записи вручную
+                //if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
+                //{
+                //    _rtspRecorder.StartRecord();
+                //    _lastMotionTime = DateTime.Now;
 
-                }
-                if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
-                {
-                    await _rtspRecorder.StopRecordAsync();
-                    _lastMotionTime = null;
-                }
+                //}
+                //if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
+                //{
+                //    await _rtspRecorder.StopRecordAsync();
+                //    _lastMotionTime = null;
+                //}
             };
 
         }

@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Nullable>enable</Nullable>
@@ -23,5 +23,10 @@
    </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CameraRecorder\CameraRecorder.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="camerarecorder.settings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>
