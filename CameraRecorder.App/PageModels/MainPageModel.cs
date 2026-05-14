@@ -65,13 +65,10 @@ namespace CameraRecorder.App.PageModels
                 ChangedBlocksRatioThreshold = 0.01,  // 1.5% (около 130 блоков)
                 SigmaThreshold = 2.5,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
 
-                // Фон
-                AdaptationSpeed = 0.12,
                 MinFramesBeforeDetection = 10,
                 StatsRecalculationPeriod = 30,
 
                 // Фильтры
-                UseAdaptiveBackground = true,
                 EnableSpikeFilter = true,
                 MinMotionDuration = 2,                // 2 кадра подряд для подтверждения
                 MaxGlobalBrightnessChange = 50

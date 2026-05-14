@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace CameraRecorder.MotionAnalyzers;
 
@@ -48,10 +49,6 @@ public class MotionDetectorSettings
     /// </summary>
     public int Height { get; set; }
 
-    /// <summary>
-    /// Скорость адаптации к изменению освещения (0-1, 0=медленно, 1=быстро)
-    /// </summary>
-    public double AdaptationSpeed { get; set; } = 0.1;
 
     /// <summary>
     /// Минимальное количество кадров перед началом детекции
@@ -62,11 +59,6 @@ public class MotionDetectorSettings
     /// Период пересчёта статистики освещения (количество кадров)
     /// </summary>
     public int StatsRecalculationPeriod { get; set; } = 30;
-
-    /// <summary>
-    /// Использовать адаптивный фон (медианный фильтр)
-    /// </summary>
-    public bool UseAdaptiveBackground { get; set; } = true;
 
     /// <summary>
     /// Включить фильтрацию всплесков (подавление кратковременных шумов)
@@ -93,8 +85,6 @@ public class MotionDetectorSettings
         if (Height <= 0) throw new ArgumentException("Height должен быть > 0");
         if (ChangedBlocksRatioThreshold < 0 || ChangedBlocksRatioThreshold > 1)
             throw new ArgumentException("ChangedBlocksRatioThreshold должен быть в диапазоне 0-1");
-        if (AdaptationSpeed < 0 || AdaptationSpeed > 1)
-            throw new ArgumentException("AdaptationSpeed должен быть в диапазоне 0-1");
     }
 }
 
@@ -149,7 +139,6 @@ public class AdaptiveMotionDetector
     private readonly MotionDetectorSettings _settings;
     private readonly ILogger<AdaptiveMotionDetector> _logger;
     private readonly Queue<byte[]> _frameBuffer;
-    private readonly Queue<double> _globalBrightnessHistory;
     private readonly int _blocksPerRow;
     private readonly int _blocksPerCol;
     private readonly int _totalBlocks;
@@ -157,9 +146,6 @@ public class AdaptiveMotionDetector
     private int _framesProcessed;
     private int _framesSinceLastStats;
     private LightingStats _currentLightingStats;
-    private byte[] _adaptiveBackground;
-    private double _referenceGlobalBrightness;
-    private double _brightnessSum;
 
     // ── Стратегия извлечения яркости (выбирается один раз) ──
     private readonly Func<byte[], int, byte> _getBrightness;
@@ -183,6 +169,7 @@ public class AdaptiveMotionDetector
         _totalBlocks = _blocksPerCol * _blocksPerRow;
 
         _frameBuffer = new Queue<byte[]>();
+        _bytesPerPixel = GetBytesPerPixel(_settings.PixelFormat);
         _getBrightness = settings.PixelFormat switch
         {
             PixelFormat.Y => static (data, i) => data[i],
@@ -192,7 +179,6 @@ public class AdaptiveMotionDetector
             PixelFormat.BGRA => BgrBrightness,
             _ => throw new NotSupportedException($"Формат {settings.PixelFormat} не поддерживается")
         };
-        _globalBrightnessHistory = new Queue<double>();
 
         _logger.LogWarning($"[AdaptiveMotionDetector] Инициализирован:");
         _logger.LogWarning($"  Размер: {settings.Width}x{settings.Height}");
@@ -303,7 +289,7 @@ public class AdaptiveMotionDetector
             newThreshold *= 1.3;
 
         // Не даём порогу уйти в 0 или в бесконечность
-        newThreshold = Math.Clamp(newThreshold, 3.0, 200.0);
+        newThreshold = Math.Clamp(newThreshold, 3.0, 250.0);
 
         stats.AdaptiveThreshold = newThreshold;
 
@@ -311,38 +297,10 @@ public class AdaptiveMotionDetector
     }
 
     /// <summary>
-    /// Обновление адаптивного фона
-    /// </summary>
-    private void UpdateAdaptiveBackground(byte[] currentMap)
-    {
-        if (_adaptiveBackground == null)
-        {
-            _adaptiveBackground = new byte[_totalBlocks];
-            Array.Copy(currentMap, _adaptiveBackground, _totalBlocks);
-            return;
-        }
-
-        // Экспоненциальное скользящее среднее для фона
-        double alpha = _settings.AdaptationSpeed;
-
-        for (int i = 0; i < _totalBlocks; i++)
-        {
-            _adaptiveBackground[i] = (byte)(
-                _adaptiveBackground[i] * (1 - alpha) +
-                currentMap[i] * alpha
-            );
-        }
-    }
-
-    /// <summary>
     /// Получение фоновой карты (медианный фильтр или адаптивный фон)
     /// </summary>
     private byte[] GetBackgroundMap()
     {
-        if (_settings.UseAdaptiveBackground && _adaptiveBackground != null)
-        {
-            return _adaptiveBackground;
-        }
 
         if (_frameBuffer.Count < 3)
             return null;
@@ -385,28 +343,6 @@ public class AdaptiveMotionDetector
     }
 
     /// <summary>
-    /// Проверка глобального изменения освещения
-    /// </summary>
-    private bool IsGlobalLightingChange(byte[] currentMap)
-    {
-        if (_globalBrightnessHistory.Count < 10)
-            return false;
-
-        if (_referenceGlobalBrightness == 0)
-        {
-            _referenceGlobalBrightness = _brightnessSum / _globalBrightnessHistory.Count;
-            return false;
-        }
-
-        double currentGlobal = _globalBrightnessHistory.Last();
-        double change = Math.Abs(currentGlobal - _referenceGlobalBrightness);
-
-        _referenceGlobalBrightness = _referenceGlobalBrightness * 0.995 + currentGlobal * 0.005;
-
-        return change > _settings.MaxGlobalBrightnessChange;
-    }
-
-    /// <summary>
     /// Фильтрация всплесков (кратковременных движений)
     /// </summary>
     private bool FilterSpikes(bool currentMotion)
@@ -439,17 +375,37 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Обновление статистики освещения (периодически)
     /// </summary>
+    private readonly Queue<LightingStats> _statsHistory = new();
+
     private void UpdateLightingStatsPeriodic(byte[] brightnessMap)
     {
         _framesSinceLastStats++;
 
         if (_framesSinceLastStats >= _settings.StatsRecalculationPeriod)
         {
-            _currentLightingStats = CalculateLightingStats(brightnessMap);
+            var stats = CalculateLightingStats(brightnessMap);
+            _statsHistory.Enqueue(stats);
+            while (_statsHistory.Count > 10)
+                _statsHistory.Dequeue();
+
+            _currentLightingStats = new LightingStats
+            {
+                GlobalBrightness = Median(_statsHistory.Select(s => s.GlobalBrightness)),
+                BrightnessStdDev = Median(_statsHistory.Select(s => s.BrightnessStdDev)),
+                NoiseLevel = Median(_statsHistory.Select(s => s.NoiseLevel)),
+                AdaptiveThreshold = Median(_statsHistory.Select(s => s.AdaptiveThreshold)),
+            };
             _framesSinceLastStats = 0;
-
-
         }
+    }
+
+    private static double Median(IEnumerable<double> values)
+    {
+        var sorted = values.OrderBy(v => v).ToList();
+        int mid = sorted.Count / 2;
+        return sorted.Count % 2 == 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2.0
+            : sorted[mid];
     }
 
     /// <summary>
@@ -460,34 +416,19 @@ public class AdaptiveMotionDetector
         var startTime = DateTime.Now;
         var result = new MotionDetectionResult() { RtpTimestamp = RtpTimestamp };
 
-        int bytesPerPixel = GetBytesPerPixel(_settings.PixelFormat);
 
-
-        if (rgbaData.Length != _settings.Width * _settings.Height * bytesPerPixel)
+        if (rgbaData.Length != _settings.Width * _settings.Height * _bytesPerPixel)
         {
             throw new ArgumentException(
                 $"Размер данных не соответствует изображению. " +
-                $"Ожидается: {_settings.Width * _settings.Height * bytesPerPixel}, получено: {rgbaData.Length}");
+                $"Ожидается: {_settings.Width * _settings.Height * _bytesPerPixel}, получено: {rgbaData.Length}");
         }
+
+        // Получаем эталонный фон
+        byte[] background = GetBackgroundMap();
 
         // Получаем карту яркости
         var currentMap = GetBlockBrightnessMap(rgbaData);
-
-        // Обновляем историю глобальной яркости
-        long sum = 0;
-        for (int i = 0; i < _totalBlocks; i++)
-            sum += currentMap[i];
-        double globalBrightness = (double)sum / _totalBlocks;
-
-        _brightnessSum += globalBrightness;
-        _globalBrightnessHistory.Enqueue(globalBrightness);
-
-        while (_globalBrightnessHistory.Count > 100)
-        {
-            _brightnessSum -= _globalBrightnessHistory.Dequeue();
-        }
-
-
 
         // Добавляем в буфер
         _frameBuffer.Enqueue(currentMap);
@@ -509,29 +450,10 @@ public class AdaptiveMotionDetector
             return result;
         }
 
-        // Получаем эталонный фон
-        byte[] background = GetBackgroundMap();
-
         if (background == null)
         {
             result.HasMotion = false;
             result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-            return result;
-        }
-
-        // Проверяем глобальное изменение освещения
-        bool isLightingChange = IsGlobalLightingChange(currentMap);
-
-        if (isLightingChange)
-        {
-            // При изменении освещения ускоряем адаптацию фона
-            UpdateAdaptiveBackground(currentMap);
-            _currentLightingStats = CalculateLightingStats(currentMap);
-            _framesSinceLastStats = 0;
-            result.IsAdapting = true;
-            result.HasMotion = false;
-            result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-            result.CurrentThreshold = _currentLightingStats.AdaptiveThreshold;
             return result;
         }
 
@@ -578,12 +500,6 @@ public class AdaptiveMotionDetector
         result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
         result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
 
-        // Обновляем адаптивный фон (даже при движении, но медленнее)
-        if (_settings.UseAdaptiveBackground && !result.HasMotion)
-        {
-            UpdateAdaptiveBackground(currentMap);
-        }
-
         _logger.LogInformation(result.ToString());
 
         return result;
@@ -595,15 +511,12 @@ public class AdaptiveMotionDetector
     public void Reset()
     {
         _frameBuffer.Clear();
-        _globalBrightnessHistory.Clear();
-        _adaptiveBackground = null;
+        _statsHistory.Clear();
         _currentLightingStats = null;
         _framesProcessed = 0;
         _framesSinceLastStats = 0;
         _consecutiveMotionFrames = 0;
         _consecutiveNoMotionFrames = 0;
-        _referenceGlobalBrightness = 0;
-        _brightnessSum = 0;
         _logger.LogWarning("[AdaptiveMotionDetector] Сброшен");
     }
 
