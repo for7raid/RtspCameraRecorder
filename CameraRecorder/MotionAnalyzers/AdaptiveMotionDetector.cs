@@ -159,6 +159,10 @@ public class AdaptiveMotionDetector
     private int _consecutiveMotionFrames;
     private int _consecutiveNoMotionFrames;
 
+    // Recycled arrays for hot path
+    private byte[] _medianBg;
+    private bool[] _changedMap;
+
     // ── Helper: index = row * _blocksPerRow + col ──
     private int Idx(int row, int col) => row * _blocksPerRow + col;
 
@@ -310,16 +314,22 @@ public class AdaptiveMotionDetector
         if (_frameBuffer.Length < 3)
             return null;
 
-        var medianBackground = new byte[_totalBlocks];
+        if (_medianBg == null || _medianBg.Length != _totalBlocks)
+            _medianBg = new byte[_totalBlocks];
+        var medianBackground = _medianBg;
         var temp = new byte[_frameBuffer.Length];
         int count = _frameBuffer.Length;
         int mid = count / 2;
         bool even = count % 2 == 0;
 
+        var frames = new byte[count][];
+        for (int j = 0; j < count; j++)
+            frames[j] = _frameBuffer.GetAt(j);
+
         for (int i = 0; i < _totalBlocks; i++)
         {
             for (int j = 0; j < count; j++)
-                temp[j] = _frameBuffer.GetAt(j)[i];
+                temp[j] = frames[j][i];
 
             Array.Sort(temp);
             medianBackground[i] = even
@@ -335,7 +345,10 @@ public class AdaptiveMotionDetector
     /// </summary>
     private (bool[] map, int changedCount, double changedRatio, double avgChangeIntensity) CompareBrightnessMaps(byte[] current, byte[] reference, double threshold)
     {
-        var changed = new bool[_totalBlocks];
+        if (_changedMap == null || _changedMap.Length != _totalBlocks)
+            _changedMap = new bool[_totalBlocks];
+        Array.Clear(_changedMap, 0, _totalBlocks);
+        var changed = _changedMap;
         long totalDiff = 0;
         int changedCount = 0;
 
@@ -519,6 +532,8 @@ public class AdaptiveMotionDetector
     public void Reset()
     {
         _frameBuffer.Clear();
+        _medianBg = null;
+        _changedMap = null;
         _adaptiveThresholdHistory.Clear();
         _globalBrightnessHistory.Clear();
         _noiseLevelHistory.Clear();
