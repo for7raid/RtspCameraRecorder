@@ -123,7 +123,7 @@ public class MotionDetectionResult
 
     public override string ToString()
     {
-        return $"[{RtpTimestamp}] Motion: {(HasMotion ? "YES" : " NO")}, " +
+        return $"[{RtpTimestamp}] [{ProcessingTimeMs} ms] Motion: {(HasMotion ? "YES" : " NO")}, " +
                $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:P2}), " +
                $"AverageChangeIntensity: {AverageChangeIntensity:F1}, " +
                //$"Threshold: {CurrentThreshold}, " +
@@ -138,7 +138,7 @@ public class AdaptiveMotionDetector
 {
     private readonly MotionDetectorSettings _settings;
     private readonly ILogger<AdaptiveMotionDetector> _logger;
-    private readonly Queue<byte[]> _frameBuffer;
+    private readonly CircularBuffer<byte[]> _frameBuffer;
     private readonly int _blocksPerRow;
     private readonly int _blocksPerCol;
     private readonly int _totalBlocks;
@@ -146,6 +146,10 @@ public class AdaptiveMotionDetector
     private int _framesProcessed;
     private int _framesSinceLastStats;
     private LightingStats _currentLightingStats;
+    private readonly CircularBuffer<double> _globalBrightnessHistory = new(10);
+    private readonly CircularBuffer<double> _brightnessStdDevHistory = new(10);
+    private readonly CircularBuffer<double> _noiseLevelHistory = new(10);
+    private readonly CircularBuffer<double> _adaptiveThresholdHistory = new(10);
 
     // ── Стратегия извлечения яркости (выбирается один раз) ──
     private readonly Func<byte[], int, byte> _getBrightness;
@@ -168,7 +172,7 @@ public class AdaptiveMotionDetector
         _blocksPerRow = settings.Width / settings.BlockSize;
         _totalBlocks = _blocksPerCol * _blocksPerRow;
 
-        _frameBuffer = new Queue<byte[]>();
+        _frameBuffer = new(_settings.FrameBufferSize);
         _bytesPerPixel = GetBytesPerPixel(_settings.PixelFormat);
         _getBrightness = settings.PixelFormat switch
         {
@@ -192,6 +196,7 @@ public class AdaptiveMotionDetector
 
     private static byte BgrBrightness(byte[] d, int i) =>
         (byte)((299 * d[i + 2] + 587 * d[i + 1] + 114 * d[i]) / 1000);
+    
     /// <summary>
     /// Извлечение средней яркости блока (switch вынесен в конструктор)
     /// </summary>
@@ -302,13 +307,13 @@ public class AdaptiveMotionDetector
     private byte[] GetBackgroundMap()
     {
 
-        if (_frameBuffer.Count < 3)
+        if (_frameBuffer.Length < 3)
             return null;
 
-        var frameList = _frameBuffer.ToList();
+        var frameList = _frameBuffer.Buffer;
         var medianBackground = new byte[_totalBlocks];
-        var temp = new byte[frameList.Count];
-        int count = frameList.Count;
+        var temp = new byte[_frameBuffer.Length];
+        int count = _frameBuffer.Length;
         int mid = count / 2;
         bool even = count % 2 == 0;
 
@@ -385,7 +390,8 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Обновление статистики освещения (периодически)
     /// </summary>
-    private readonly Queue<LightingStats> _statsHistory = new();
+
+
 
     private void UpdateLightingStatsPeriodic(byte[] brightnessMap)
     {
@@ -394,34 +400,44 @@ public class AdaptiveMotionDetector
         if (_framesSinceLastStats >= _settings.StatsRecalculationPeriod)
         {
             var stats = CalculateLightingStats(brightnessMap);
-            _statsHistory.Enqueue(stats);
-            while (_statsHistory.Count > 10)
-                _statsHistory.Dequeue();
 
-            var array = _statsHistory.ToArray();
+            _globalBrightnessHistory.Add(stats.GlobalBrightness);
+            _brightnessStdDevHistory.Add(stats.BrightnessStdDev);
+            _noiseLevelHistory.Add(stats.NoiseLevel);
+            _adaptiveThresholdHistory.Add(stats.AdaptiveThreshold);
+
+
             _currentLightingStats = new LightingStats
             {
-                GlobalBrightness = Median(array, s => s.GlobalBrightness),
-                BrightnessStdDev = Median(array, s => s.BrightnessStdDev),
-                NoiseLevel = Median(array, s => s.NoiseLevel),
-                AdaptiveThreshold = Median(array, s => s.AdaptiveThreshold),
+                GlobalBrightness = MedianForSmallArray(_globalBrightnessHistory.Buffer, _globalBrightnessHistory.Length),
+                BrightnessStdDev = MedianForSmallArray(_brightnessStdDevHistory.Buffer, _globalBrightnessHistory.Length),
+                NoiseLevel = MedianForSmallArray(_noiseLevelHistory.Buffer, _noiseLevelHistory.Length),
+                AdaptiveThreshold = MedianForSmallArray(_adaptiveThresholdHistory.Buffer, _adaptiveThresholdHistory.Length),
             };
             _framesSinceLastStats = 0;
         }
     }
 
-    private static double Median(LightingStats[] _statsHistory, Func<LightingStats, double> getter)
+    private static double Median(double[] _statsHistory, int length)
     {
-        var values = new double[_statsHistory.Length];
-        for (int i = 0; i < _statsHistory.Length; i++)
-        {
-            values[i] = getter(_statsHistory[i]);
-        }
+        var values = new double[length];
+        Array.Copy(_statsHistory, values, length);
+
         Array.Sort(values);
         int mid = values.Length / 2;
         return values.Length % 2 == 0
             ? (values[mid - 1] + values[mid]) / 2.0
             : values[mid];
+    }
+
+    public static double MedianForSmallArray(double[] arr, int length)
+    {
+        // Предоплаченный буфер на стеке (избегаем аллокации)
+        Span<double> span = stackalloc double[length];
+        arr.AsSpan().Slice(0, length).CopyTo(span);
+        span.Sort();
+        int n = length;
+        return n % 2 == 1 ? span[n / 2] : (span[n / 2 - 1] + span[n / 2]) / 2.0;
     }
 
     /// <summary>
@@ -447,9 +463,7 @@ public class AdaptiveMotionDetector
         var currentMap = GetBlockBrightnessMap(rgbaData);
 
         // Добавляем в буфер
-        _frameBuffer.Enqueue(currentMap);
-        while (_frameBuffer.Count > _settings.FrameBufferSize)
-            _frameBuffer.Dequeue();
+        _frameBuffer.Add(currentMap);
 
         _framesProcessed++;
 
@@ -506,7 +520,10 @@ public class AdaptiveMotionDetector
     public void Reset()
     {
         _frameBuffer.Clear();
-        _statsHistory.Clear();
+        _adaptiveThresholdHistory.Clear();
+        _globalBrightnessHistory.Clear();
+        _noiseLevelHistory.Clear();
+        _brightnessStdDevHistory.Clear();
         _currentLightingStats = null;
         _framesProcessed = 0;
         _framesSinceLastStats = 0;
@@ -526,4 +543,37 @@ public class AdaptiveMotionDetector
                $"Шум: {stats?.NoiseLevel ?? 0:F2}, " +
                $"Порог: {stats?.AdaptiveThreshold ?? 0:F1}";
     }
+}
+
+public class CircularBuffer<T>
+{
+    public T[] Buffer { get; init; }
+    private int tail = 0;
+    private int length = 0;  // Текущее количество элементов
+
+    public CircularBuffer(int capacity)
+    {
+        Buffer = new T[capacity];
+    }
+
+    public void Add(T item)
+    {
+        Buffer[tail] = item;
+        tail = (tail + 1) % Buffer.Length;
+
+        if (length < Buffer.Length)
+            length++;
+    }
+    public void Clear()
+    {
+        // Очищаем ссылки на элементы (важно для сборщика мусора, если T - ссылочный тип)
+        Array.Clear(Buffer, 0, Buffer.Length);
+
+        // Сбрасываем указатели и счетчик
+        tail = 0;
+        length = 0;
+    }
+
+    public int Length => length;
+    public int Capacity => Buffer.Length;  // Вместимость буфера
 }

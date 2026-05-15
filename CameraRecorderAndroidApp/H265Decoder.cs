@@ -221,7 +221,7 @@ public class H265Decoder : IDisposable
                         // Копируем данные из буфера
                         byte[] decodedData = new byte[bufferInfo.Size];
                         outputBuffer.Get(decodedData);
-                        Image outputImage = _codec.GetOutputImage(outputIndex);
+                       // Image outputImage = _codec.GetOutputImage(outputIndex);
 
                         // Получаем информацию о формате пикселей
                         var outputFormat = _codec.OutputFormat;
@@ -239,7 +239,7 @@ public class H265Decoder : IDisposable
                             SliceHeight = sliceHeight > 0 ? sliceHeight : _height,
                             TimestampUs = bufferInfo.PresentationTimeUs,
                             Format = pixelFormat,
-                            Image = outputImage,
+                            //Image = outputImage,
                         };
 
                         // Вызываем событие в UI потоке (или в потоке декодера)

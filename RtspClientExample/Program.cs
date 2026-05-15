@@ -91,15 +91,17 @@ namespace RtspClientExample
             rtspViewer.FrameReceived += async (rgbBytes, RtpTimestamp) =>
             {
                 var result = detector.DetectMotion(rgbBytes, RtpTimestamp);
-                if (result.HasMotion && !hasMotion)
-                {
-                    logger.LogInformation("Есть вдижение");
-                }
-                else if (!result.HasMotion && hasMotion)
-                {
-                    logger.LogInformation("Движение остановлено");
-                }
-                hasMotion = result.HasMotion;
+                //if (result.HasMotion && !hasMotion)
+                //{
+                //    logger.LogInformation("Есть вдижение");
+                //}
+                //else if (!result.HasMotion && hasMotion)
+                //{
+                //    logger.LogInformation("Движение остановлено");
+                //}
+                //hasMotion = result.HasMotion;
+
+                //logger.LogInformation($"работа детектора {result.ProcessingTimeMs} ms");
             };
 
             recorder.Start();

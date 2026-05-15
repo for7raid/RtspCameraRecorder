@@ -1,17 +1,12 @@
-using Android.Media;
-using Android.Views;
 using CameraRecorder;
 using CameraRecorder.MotionAnalyzers;
 using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
-using Java.Nio;
-using Java.Nio.Channels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SharpMP4.Common;
-using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 
 namespace CameraRecorderAndroidApp
@@ -150,8 +145,6 @@ namespace CameraRecorderAndroidApp
         }
 
         int framescount = 0;
-        private MediaCodec _codec;
-        private MediaFormat _format;
         private H265Decoder _decoder;
         private AdaptiveMotionDetector _detector;
 
@@ -171,35 +164,6 @@ namespace CameraRecorderAndroidApp
                 }
             }
         }
-
-        async void ProcessFrames()
-        {
-            int counter = 0;
-            while (true)
-            {
-                var frame = await _frames.Reader.ReadAsync();
-                var left = _frames.Reader.CanCount ? _frames.Reader.Count : 0;
-                RunOnUiThread(() => { txtView2.Text = $"frame processed {counter++}, left {left}"; });
-                // 3. Цикл подачи данных (упрощённо)
-                int inputIndex = _codec.DequeueInputBuffer(10000); // таймаут 10 мс
-                if (inputIndex >= 0)
-                {
-                    ByteBuffer inputBuffer = _codec.GetInputBuffer(inputIndex);
-                    inputBuffer.Clear();
-                    inputBuffer.Put(frame);
-                    _codec.QueueInputBuffer(inputIndex, 0, frame.Length, 0, 0);
-                }
-
-
-            }
-        }
-
-        bool IsHevcSupported()
-        {
-            var codecList = new MediaCodecList(MediaCodecListKind.AllCodecs);
-            return codecList.FindDecoderForFormat(
-                MediaFormat.CreateVideoFormat(MediaFormat.MimetypeVideoHevc, 640, 480)) != null;
-        }
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
@@ -218,9 +182,6 @@ namespace CameraRecorderAndroidApp
             _decoder.Initialize();
             _rTSPClient.Connect("rtsp://192.168.1.8:554/stream2", "admin", "123456", RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
 
-
-
-            //Task.Run(ProcessFrames);
         }
     }
 }
