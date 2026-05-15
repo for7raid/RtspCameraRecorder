@@ -135,7 +135,7 @@ namespace CameraRecorderAndroidApp
                     txtView2.Text = $"Движение остановлено {decoded}";
                 }
 
-                txtView3.Text = $"decoded {decoded}, detection {result.ProcessingTimeMs}";
+                txtView3.Text = $"decoded {decoded}, {framescount - decoded} left, detection {result.ProcessingTimeMs} ms";
             });
             hasMotion = result.HasMotion;
 

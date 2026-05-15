@@ -196,7 +196,7 @@ public class AdaptiveMotionDetector
 
     private static byte BgrBrightness(byte[] d, int i) =>
         (byte)((299 * d[i + 2] + 587 * d[i + 1] + 114 * d[i]) / 1000);
-    
+
     /// <summary>
     /// Извлечение средней яркости блока (switch вынесен в конструктор)
     /// </summary>
@@ -310,7 +310,6 @@ public class AdaptiveMotionDetector
         if (_frameBuffer.Length < 3)
             return null;
 
-        var frameList = _frameBuffer.Buffer;
         var medianBackground = new byte[_totalBlocks];
         var temp = new byte[_frameBuffer.Length];
         int count = _frameBuffer.Length;
@@ -320,7 +319,7 @@ public class AdaptiveMotionDetector
         for (int i = 0; i < _totalBlocks; i++)
         {
             for (int j = 0; j < count; j++)
-                temp[j] = frameList[j][i];
+                temp[j] = _frameBuffer.GetAt(j)[i];
 
             Array.Sort(temp);
             medianBackground[i] = even
@@ -572,6 +571,21 @@ public class CircularBuffer<T>
         // Сбрасываем указатели и счетчик
         tail = 0;
         length = 0;
+    }
+
+    public T GetAt(int index)
+    {
+        if (index < 0 || index >= length)
+            throw new IndexOutOfRangeException($"Index {index} is out of range. Valid range: 0 to {length - 1}");
+
+        // Вычисляем реальную позицию в буфере с учетом циклического хвоста
+        int position = (tail - length + index) % Buffer.Length;
+
+        // Обработка отрицательного остатка в C#
+        if (position < 0)
+            position += Buffer.Length;
+
+        return Buffer[position];
     }
 
     public int Length => length;
