@@ -123,7 +123,7 @@ public class MotionDetectionResult
 
     public override string ToString()
     {
-        return $"Motion: {(HasMotion ? "YES" : " NO")}, " +
+        return $"[{RtpTimestamp}] Motion: {(HasMotion ? "YES" : " NO")}, " +
                $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:P2}), " +
                $"AverageChangeIntensity: {AverageChangeIntensity:F1}, " +
                //$"Threshold: {CurrentThreshold}, " +
@@ -495,7 +495,7 @@ public class AdaptiveMotionDetector
         result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
         result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
 
-        _logger.LogDebug(result.ToString());
+        _logger.LogInformation(result.ToString());
 
         return result;
     }
