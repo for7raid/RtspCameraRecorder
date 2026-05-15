@@ -153,6 +153,7 @@ public class AdaptiveMotionDetector
 
     // ── Стратегия извлечения яркости (выбирается один раз) ──
     private readonly Func<byte[], int, byte> _getBrightness;
+    private readonly int _totalBytes;
     private readonly int _bytesPerPixel;
 
     // Для фильтрации всплесков
@@ -166,14 +167,15 @@ public class AdaptiveMotionDetector
     // ── Helper: index = row * _blocksPerRow + col ──
     private int Idx(int row, int col) => row * _blocksPerRow + col;
 
+    int[] _pixelToBlockMap;
 
     public AdaptiveMotionDetector(MotionDetectorSettings settings, ILogger<AdaptiveMotionDetector> logger)
     {
         settings.Validate();
         _settings = settings;
         _logger = logger;
-        _blocksPerCol = settings.Height / settings.BlockSize;
-        _blocksPerRow = settings.Width / settings.BlockSize;
+        _blocksPerCol = (int)Math.Round(settings.Height / (double)settings.BlockSize, MidpointRounding.ToPositiveInfinity);
+        _blocksPerRow = (int)Math.Round(settings.Width / (double)settings.BlockSize, MidpointRounding.ToPositiveInfinity);
         _totalBlocks = _blocksPerCol * _blocksPerRow;
 
         _frameBuffer = new(_settings.FrameBufferSize);
@@ -188,6 +190,17 @@ public class AdaptiveMotionDetector
             _ => throw new NotSupportedException($"Формат {settings.PixelFormat} не поддерживается")
         };
 
+        _totalBytes = _settings.Width * _settings.Height * _bytesPerPixel;
+        _pixelToBlockMap = new int[_totalBytes];
+        for (int i = 0; i < _totalBytes; i += _bytesPerPixel)
+        {
+            int p = i / _bytesPerPixel;
+            int y = p / _settings.Width;
+            int x = p - y * _settings.Width;
+            int idx = (y / _settings.BlockSize) * _blocksPerRow + (x / _settings.BlockSize);
+            _pixelToBlockMap[i] = idx;
+        }
+
         _logger.LogWarning($"[AdaptiveMotionDetector] Инициализирован:");
         _logger.LogWarning($"  Размер: {settings.Width}x{settings.Height}");
         _logger.LogWarning($"  Блок: {settings.BlockSize}x{settings.BlockSize} -> {_blocksPerRow}x{_blocksPerCol} блоков");
@@ -200,28 +213,6 @@ public class AdaptiveMotionDetector
 
     private static byte BgrBrightness(byte[] d, int i) =>
         (byte)((299 * d[i + 2] + 587 * d[i + 1] + 114 * d[i]) / 1000);
-
-    /// <summary>
-    /// Извлечение средней яркости блока (switch вынесен в конструктор)
-    /// </summary>
-    private byte GetBlockAverageBrightness(byte[] imageData, int blockRow, int blockCol)
-    {
-        int startX = blockCol * _settings.BlockSize;
-        int startY = blockRow * _settings.BlockSize;
-        int sum = 0, count = 0;
-        int w = _settings.Width, h = _settings.Height, blockSize = _settings.BlockSize;
-
-        for (int y = 0; y < blockSize && startY + y < h; y++)
-        {
-            int rowOff = (startY + y) * w;
-            for (int x = 0; x < blockSize && startX + x < w; x++)
-            {
-                sum += _getBrightness(imageData, (rowOff + startX + x) * _bytesPerPixel);
-                count++;
-            }
-        }
-        return (byte)(count > 0 ? sum / count : 0);
-    }
 
     private static int GetBytesPerPixel(PixelFormat format)
     {
@@ -237,20 +228,24 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Получение одномерной карты яркости блоков (row-major)
     /// </summary>
-    private byte[] GetBlockBrightnessMap(byte[] rgbaData)
+    private byte[] GetBlockBrightnessMap(byte[] imageData)
     {
-        var brightnessMap = new byte[_totalBlocks];
-
-        for (int row = 0; row < _blocksPerCol; row++)
+        var blockSums = new int[_totalBlocks];
+        int w = _settings.Width, h = _settings.Height, bs = _settings.BlockSize;
+       
+        for (int i = 0; i < _totalBytes; i += _bytesPerPixel)
         {
-            for (int col = 0; col < _blocksPerRow; col++)
-            {
-                brightnessMap[Idx(row, col)] = GetBlockAverageBrightness(rgbaData, row, col);
-            }
+            blockSums[_pixelToBlockMap[i]] += _getBrightness(imageData, i);
         }
+
+        var brightnessMap = new byte[_totalBlocks];
+        int count = bs * bs;
+        for (int i = 0; i < _totalBlocks; i++)
+            brightnessMap[i] = (byte)(blockSums[i] / count);
 
         return brightnessMap;
     }
+
 
     /// <summary>
     /// Расчёт статистики освещения

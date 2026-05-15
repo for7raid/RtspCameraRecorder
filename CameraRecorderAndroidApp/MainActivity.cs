@@ -124,17 +124,18 @@ namespace CameraRecorderAndroidApp
             var result = _detector.DetectMotion(e.Frame.ToY(), (ulong)e.Frame.TimestampUs);
             RunOnUiThread(() =>
             {
-                if (result.HasMotion && !hasMotion)
-                {
-                    //logger.LogInformation("Есть вдижение");
-                    txtView2.Text = $"Есть вдижение {decoded}";
-                }
-                else if (!result.HasMotion && hasMotion)
-                {
-                    //logger.LogInformation("Движение остановлено");
-                    txtView2.Text = $"Движение остановлено {decoded}";
-                }
+            //    if (result.HasMotion && !hasMotion)
+            //    {
+            //        //logger.LogInformation("Есть вдижение");
+            //        txtView2.Text = $"Есть вдижение {decoded}";
+            //    }
+            //    else if (!result.HasMotion && hasMotion)
+            //    {
+            //        //logger.LogInformation("Движение остановлено");
+            //        txtView2.Text = $"Движение остановлено {decoded}";
+            //    }
 
+                txtView2.Text = result.ToString();
                 txtView3.Text = $"decoded {decoded}, {framescount - decoded} left, detection {result.ProcessingTimeMs} ms";
             });
             hasMotion = result.HasMotion;
