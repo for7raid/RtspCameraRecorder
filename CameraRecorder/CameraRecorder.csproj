@@ -12,6 +12,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CameraRecorder.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />
     <PackageReference Include="H264Sharp" Version="1.6.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.8" />

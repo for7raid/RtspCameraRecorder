@@ -1,8 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
-using System.Linq;
-
+﻿
+using Microsoft.Extensions.Logging;
 namespace CameraRecorder.MotionAnalyzers;
-
 public enum PixelFormat
 {
     RGB,     // 3 байта: R,G,B
@@ -262,7 +260,7 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Расчёт статистики освещения
     /// </summary>
-    private LightingStats CalculateLightingStats(byte[] brightnessMap)
+    internal LightingStats CalculateLightingStats(byte[] brightnessMap)
     {
         var stats = new LightingStats();
 
