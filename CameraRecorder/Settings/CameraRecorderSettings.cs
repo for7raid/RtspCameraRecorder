@@ -3,9 +3,14 @@ namespace CameraRecorder.Settings;
 public class CameraRecorderSettings
 {
     /// <summary>
-    /// Хост RTSP-потока (IP или домен)
+    /// Путь основгого RTSP-потока (IP или домен)
     /// </summary>
-    public string RtspUrl { get; init; } = string.Empty;
+    public string RtspMainStreamUrl { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Путь вспомогательного RTSP-потока (IP или домен) для детекции движения
+    /// </summary>
+    public string RtspSubStreamUrl { get; init; } = string.Empty;
 
     /// <summary>
     /// Логин для RTSP-аутентификации
@@ -69,7 +74,8 @@ public class CameraRecorderSettings
 
     public static CameraRecorderSettings Default { get; } = new CameraRecorderSettings()
     {
-        RtspUrl = " rtsp://192.168.1.8:554/stream1",
+        RtspMainStreamUrl = " rtsp://192.168.1.8:554/stream1",
+        RtspSubStreamUrl = " rtsp://192.168.1.8:554/stream2",
         RtspLogin = "admin",
         RtspPassword = "123456",
         LocalStorageEnabled = true,

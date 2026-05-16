@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="vertical"
+      android:padding="16dp">
+
+    <!-- RTSP -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="RTSP"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_marginTop="12dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Основной поток"
+        android:layout_marginTop="8dp" />
+    <EditText
+        android:id="@+id/etRtspMainStreamUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="rtsp://192.168.1.8:554/stream1" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Подпоток для детекции"
+        android:layout_marginTop="8dp" />
+    <EditText
+        android:id="@+id/etRtspSubStreamUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="rtsp://192.168.1.8:554/stream2" />
+
+    <EditText
+        android:id="@+id/etRtspLogin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Логин" />
+
+    <EditText
+        android:id="@+id/etRtspPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Пароль"
+        android:inputType="textPassword" />
+
+    <!-- Локальное хранилище -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Локальное хранилище"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_marginTop="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:text="Активно" />
+      <Switch
+          android:id="@+id/swLocalStorageEnabled"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/etLocalRecordingsPath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Путь для записей" />
+
+    <!-- FTP -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FTP"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_marginTop="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:text="Активно" />
+      <Switch
+          android:id="@+id/swFtpEnabled"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/etFtpHost"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Хост" />
+
+    <EditText
+        android:id="@+id/etFtpLogin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Логин" />
+
+    <EditText
+        android:id="@+id/etFtpPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Пароль"
+        android:inputType="textPassword" />
+
+    <EditText
+        android:id="@+id/etFtpDirectory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Директория на сервере" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:text="FTPS (SSL/TLS)" />
+      <Switch
+          android:id="@+id/swUseFtps"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- Запись -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Параметры записи"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_marginTop="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="До движения (сек)" />
+    <SeekBar
+        android:id="@+id/sbPreMotion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="60" />
+    <TextView
+        android:id="@+id/tvPreMotionValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="10" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="После движения (сек)" />
+    <SeekBar
+        android:id="@+id/sbPostMotion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="60" />
+    <TextView
+        android:id="@+id/tvPostMotionValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="10" />
+
+    <Button
+        android:id="@+id/btnSave"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Сохранить настройки"
+        android:layout_marginTop="24dp" />
+
+  </LinearLayout>
+</ScrollView>

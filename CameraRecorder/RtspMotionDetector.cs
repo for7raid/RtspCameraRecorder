@@ -122,7 +122,7 @@ public class RtspMotionDetector
     public void Start()
     {
         _client.Stop();
-        if (!string.IsNullOrWhiteSpace(_options.Value.RtspUrl))
+        if (!string.IsNullOrWhiteSpace(_options.Value.RtspMainStreamUrl))
         {
             _client.Connect("rtsp://192.168.1.8:554/stream2", _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
         }

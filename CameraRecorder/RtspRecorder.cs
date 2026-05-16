@@ -156,9 +156,9 @@ public class RtspRecorder
     public void Start()
     {
         _client.Stop();
-        if (!string.IsNullOrWhiteSpace(_options.Value.RtspUrl))
+        if (!string.IsNullOrWhiteSpace(_options.Value.RtspMainStreamUrl))
         {
-            _client.Connect(_options.Value.RtspUrl, _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+            _client.Connect(_options.Value.RtspMainStreamUrl, _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
         }
     }
 }

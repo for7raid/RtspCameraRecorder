@@ -19,7 +19,7 @@ public class StaticSettingsProvider
 
         _settings = new CameraRecorderSettings
         {
-            RtspUrl = _config["RtspUrl"] ?? "rtsp://192.168.1.8:554/stream1",
+            RtspMainStreamUrl = _config["RtspUrl"] ?? "rtsp://192.168.1.8:554/stream1",
             RtspLogin = _config["RtspLogin"] ?? "admin",
             RtspPassword = _config["RtspPassword"] ?? "123456",
             //LocalStorageEnabled = _config.Get<bool>("LocalStorageEnabled") ?? true,
