@@ -3,6 +3,7 @@ using CameraRecorder.Settings;
 using H264Sharp;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Runtime.InteropServices;
 
 namespace CameraRecorder;
 
@@ -54,6 +55,7 @@ public class RtspViewer
 
 
     RgbImage rgbOut = new RgbImage(H264Sharp.ImageFormat.Rgb, 640, 480);
+    YuvImage yuvImage = new YuvImage(640, 480);
     void ReceivedVideoData_H264(RTSPClient client, SimpleDataEventArgs dataArgs)
     {
         foreach (var nalUnitMem in dataArgs.Data)
@@ -65,11 +67,15 @@ public class RtspViewer
                 var unit = nalUnitMem.Slice(5);
                 DecodingState ds;
 
-                var dec = _decoder.Decode(nalUnitMem.ToArray(), 0, nalUnit.Length, noDelay: true, out ds, ref rgbOut);
+                var dec = _decoder.Decode(nalUnitMem.ToArray(), 0, nalUnit.Length, noDelay: true, out ds, ref yuvImage);
                 if (dec && ds == DecodingState.dsErrorFree)
                 {
-
-                    FrameReceived?.Invoke(rgbOut.GetBytes(), dataArgs.RtpTimestamp);
+                    var yPlane = new byte[yuvImage.Width * yuvImage.Height];
+                    unsafe
+                    {
+                        Marshal.Copy(yuvImage.ImageBytes, yPlane, 0, yPlane.Length);
+                    }
+                    FrameReceived?.Invoke(yPlane, dataArgs.RtpTimestamp);
 
                 }
                 else

@@ -68,6 +68,7 @@ namespace RtspClientExample
 
             MotionDetectorSettings settings = new()
             {
+                PixelFormat = PixelFormat.Y,
                 Width = 640,
                 Height = 480,
                 BlockSize = 6,                        // Компромисс: 6×6 (106×80 ≈ 8 500 блоков)

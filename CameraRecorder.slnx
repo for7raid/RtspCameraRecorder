@@ -2,6 +2,7 @@
   <Project Path="CameraRecorder.App/CameraRecorder.App.csproj" Id="490c654d-9fa9-4ff4-a5e8-74ca52b42d0f">
     <Deploy />
   </Project>
+  <Project Path="CameraRecorder.Testing/CameraRecorder.Testing.csproj" Id="255a31ff-76a0-477c-84a5-64417b337b63" />
   <Project Path="CameraRecorder/CameraRecorder.csproj" />
   <Project Path="CameraRecorderAndroidApp/CameraRecorderAndroidApp.csproj" Id="f60d547b-2607-437c-91f8-e9355c879ed5">
     <Deploy Solution="Debug|*" />

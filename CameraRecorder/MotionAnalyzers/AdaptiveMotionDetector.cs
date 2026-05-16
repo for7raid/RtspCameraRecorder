@@ -123,7 +123,7 @@ public class MotionDetectionResult
 
     public override string ToString()
     {
-        return $"[{RtpTimestamp}] [{ProcessingTimeMs} ms] Motion: {(HasMotion ? "YES" : " NO")}, " +
+        return $"[{RtpTimestamp}] [{ProcessingTimeMs:0.00} ms] Motion: {(HasMotion ? "YES" : " NO")}, " +
                $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:P2}), " +
                $"AverageChangeIntensity: {AverageChangeIntensity:F1}, " +
                //$"Threshold: {CurrentThreshold}, " +
@@ -168,6 +168,7 @@ public class AdaptiveMotionDetector
     private int Idx(int row, int col) => row * _blocksPerRow + col;
 
     int[] _pixelToBlockMap;
+    int[][] _colrowToPixelMap;
 
     public AdaptiveMotionDetector(MotionDetectorSettings settings, ILogger<AdaptiveMotionDetector> logger)
     {
@@ -201,6 +202,16 @@ public class AdaptiveMotionDetector
             _pixelToBlockMap[i] = idx;
         }
 
+        _colrowToPixelMap = new int[_blocksPerCol][];
+        for (int row = 0; row < _blocksPerCol; row++)
+        {
+            _colrowToPixelMap[row] = new int[_blocksPerRow];
+            for (int col = 0; col < _blocksPerRow; col++)
+            {
+                _colrowToPixelMap[row][col] = Idx(row, col);
+            }
+        }
+
         _logger.LogWarning($"[AdaptiveMotionDetector] Инициализирован:");
         _logger.LogWarning($"  Размер: {settings.Width}x{settings.Height}");
         _logger.LogWarning($"  Блок: {settings.BlockSize}x{settings.BlockSize} -> {_blocksPerRow}x{_blocksPerCol} блоков");
@@ -232,17 +243,18 @@ public class AdaptiveMotionDetector
     {
         var blockSums = new int[_totalBlocks];
         int w = _settings.Width, h = _settings.Height, bs = _settings.BlockSize;
-       
+        int blockSquare = bs * bs;
+
         for (int i = 0; i < _totalBytes; i += _bytesPerPixel)
         {
-            blockSums[_pixelToBlockMap[i]] += _getBrightness(imageData, i);
+            var block = _pixelToBlockMap[i];
+            blockSums[block] += _getBrightness(imageData, i);
         }
 
         var brightnessMap = new byte[_totalBlocks];
         int count = bs * bs;
         for (int i = 0; i < _totalBlocks; i++)
             brightnessMap[i] = (byte)(blockSums[i] / count);
-
         return brightnessMap;
     }
 
@@ -277,8 +289,8 @@ public class AdaptiveMotionDetector
         {
             for (int col = 0; col < _blocksPerRow - 1; col++)
             {
-                int diffHorizontal = Math.Abs(brightnessMap[Idx(row, col)] - brightnessMap[Idx(row, col + 1)]);
-                int diffVertical = Math.Abs(brightnessMap[Idx(row, col)] - brightnessMap[Idx(row + 1, col)]);
+                int diffHorizontal = Math.Abs(brightnessMap[_colrowToPixelMap[row][col]] - brightnessMap[_colrowToPixelMap[row][col + 1]]);
+                int diffVertical = Math.Abs(brightnessMap[_colrowToPixelMap[row][col]] - brightnessMap[_colrowToPixelMap[row + 1][col]]);
                 noiseSum += diffHorizontal + diffVertical;
                 noiseCount += 2;
             }
@@ -400,7 +412,7 @@ public class AdaptiveMotionDetector
 
 
 
-    private void UpdateLightingStatsPeriodic(byte[] brightnessMap)
+    private void UpdateLightingStatsPeriodic_(byte[] brightnessMap)
     {
         _framesSinceLastStats++;
 
@@ -424,17 +436,25 @@ public class AdaptiveMotionDetector
             _framesSinceLastStats = 0;
         }
     }
-
-    private static double Median(double[] _statsHistory, int length)
+    private void UpdateLightingStatsPeriodic(byte[] brightnessMap)
     {
-        var values = new double[length];
-        Array.Copy(_statsHistory, values, length);
 
-        Array.Sort(values);
-        int mid = values.Length / 2;
-        return values.Length % 2 == 0
-            ? (values[mid - 1] + values[mid]) / 2.0
-            : values[mid];
+        _framesSinceLastStats++;
+
+        if (_framesSinceLastStats >= _settings.StatsRecalculationPeriod)
+        {
+            var stats = CalculateLightingStats(brightnessMap);
+            _currentLightingStats = _currentLightingStats == null
+                ? stats
+                : new LightingStats
+                {
+                    GlobalBrightness = _currentLightingStats.GlobalBrightness * 0.8 + stats.GlobalBrightness * 0.2,
+                    BrightnessStdDev = _currentLightingStats.BrightnessStdDev * 0.8 + stats.BrightnessStdDev * 0.2,
+                    NoiseLevel = _currentLightingStats.NoiseLevel * 0.8 + stats.NoiseLevel * 0.2,
+                    AdaptiveThreshold = _currentLightingStats.AdaptiveThreshold * 0.8 + stats.AdaptiveThreshold * 0.2,
+                };
+            _framesSinceLastStats = 0;
+        }
     }
 
     public static double MedianForSmallArray(double[] arr, int length)
