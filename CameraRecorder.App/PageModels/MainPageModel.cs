@@ -11,7 +11,7 @@ namespace CameraRecorder.App.PageModels
     public partial class MainPageModel : ObservableObject
     {
         private readonly RtspRecorder _rtspRecorder;
-        private readonly RtspViewer _rtspViewer;
+        private readonly RtspMotionDetector _rtspMotionDetector;
         private readonly IOptions<CameraRecorderSettings> _options;
         [ObservableProperty]
         bool _isRecording;
@@ -25,8 +25,6 @@ namespace CameraRecorder.App.PageModels
         [ObservableProperty]
         private string _today = DateTime.Now.ToString("dddd, MMM d");
 
-        private DateTime? _lastMotionTime;
-
         [ObservableProperty]
         private string _log = string.Empty;
 
@@ -35,17 +33,18 @@ namespace CameraRecorder.App.PageModels
 
         public MainPageModel(
             RtspRecorder rtspRecorder,
-            RtspViewer rtspViewer,
+            RtspMotionDetector rtspMotionDetector,
             ILoggerFactory loggerFactory,
             IOptions<CameraRecorderSettings> options)
         {
 
             _rtspRecorder = rtspRecorder;
-            _rtspViewer = rtspViewer;
+            _rtspMotionDetector = rtspMotionDetector;
             _options = options;
 
-            _rtspRecorder.RecordingStarted += () => IsRecording = true;
-            _rtspRecorder.RecordingStopped += () => IsRecording = false;
+            _rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); IsRecording = true; };
+            _rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecordAsync(); IsRecording = false; };
+
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {
                 RecordDuration = duration;
@@ -53,63 +52,19 @@ namespace CameraRecorder.App.PageModels
             };
 
             _rtspRecorder.Start();
-
-            MotionDetectorSettings settings = new()
-            {
-                Width = 640,
-                Height = 480,
-                BlockSize = 6,                        // Компромисс: 6×6 (106×80 ≈ 8 500 блоков)
-                FrameBufferSize = 30,
-
-                // Ключевые параметры
-                ChangedBlocksRatioThreshold = 0.01,  // 1.5% (около 130 блоков)
-                SigmaThreshold = 2.5,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
-
-                MinFramesBeforeDetection = 10,
-                StatsRecalculationPeriod = 30,
-
-                // Фильтры
-                EnableSpikeFilter = true,
-                MinMotionDuration = 4,                // 2 кадра подряд для подтверждения
-                MaxGlobalBrightnessChange = 50
-            };
-
-            var detector = new AdaptiveMotionDetector(settings, loggerFactory.CreateLogger<AdaptiveMotionDetector>());
-            int counter = 0;
-            rtspViewer.FrameReceived += async (rgbBytes, RtpTimestamp) =>
-            {
-                var result = detector.DetectMotion(rgbBytes, RtpTimestamp);
-                //Log = Log.Substring(Math.Max(0, Log.Length - 200)) + "-" + (counter++) + (result.HasMotion ? "YES" : "NO");
-                _isRecording = result.HasMotion;
-
-                ////Запускаем запись по движению, если сейчас нет записи вручную
-                //if ((!_rtspRecorder.IsRecording || _lastMotionTime.HasValue) && result.HasMotion)
-                //{
-                //    _rtspRecorder.StartRecord();
-                //    _lastMotionTime = DateTime.Now;
-
-                //}
-                //if (_lastMotionTime.HasValue && (DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
-                //{
-                //    await _rtspRecorder.StopRecordAsync();
-                //    _lastMotionTime = null;
-                //}
-            };
-
         }
-
 
 
         [RelayCommand]
         private void NavigatedTo()
         {
-            _rtspViewer.Start();
+            _rtspMotionDetector.Start();
         }
 
         [RelayCommand]
         private void NavigatedFrom()
         {
-            _rtspViewer.Stop();
+            _rtspMotionDetector.Stop();
         }
 
         [RelayCommand]

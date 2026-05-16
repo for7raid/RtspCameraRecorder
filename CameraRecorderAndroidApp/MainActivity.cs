@@ -15,7 +15,7 @@ namespace CameraRecorderAndroidApp
     public class MainActivity : Activity
     {
         private RtspRecorder recorder;
-        private RtspViewer rtspViewer;
+        private RtspMotionDetector rtspViewer;
         private TextView? txtView;
         private TextView? txtView2;
 
@@ -34,7 +34,7 @@ namespace CameraRecorderAndroidApp
             services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
-            services.AddTransient<RtspViewer>();
+            services.AddTransient<RtspMotionDetector>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
             //services.AddSingleton<StaticSettingsProvider>();
             //            services.AddTransient(sp => Options.Create(sp.GetRequiredService<StaticSettingsProvider>().GetSettings()));

@@ -25,9 +25,10 @@ namespace RtspClientExample
             services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
-            services.AddTransient<RtspViewer>();
+            services.AddTransient<RtspMotionDetector>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
             services.AddSingleton<StaticSettingsProvider>();
+            services.AddSingleton<IH26xDecoder, H264SharpDecoder>();
             //            services.AddTransient(sp => Options.Create(sp.GetRequiredService<StaticSettingsProvider>().GetSettings()));
 
             services.AddTransient<IStorageSink, LocalFileSink_>();
@@ -63,50 +64,14 @@ namespace RtspClientExample
 
             // Получаем сервис
             var recorder = serviceProvider.GetRequiredService<RtspRecorder>();
-            var rtspViewer = serviceProvider.GetRequiredService<RtspViewer>();
+            var rtspMotionDetector = serviceProvider.GetRequiredService<RtspMotionDetector>();
             logger = serviceProvider.GetRequiredService<ILogger<Recorder>>();
 
-            MotionDetectorSettings settings = new()
-            {
-                PixelFormat = PixelFormat.Y,
-                Width = 640,
-                Height = 480,
-                BlockSize = 6,                        // Компромисс: 6×6 (106×80 ≈ 8 500 блоков)
-                FrameBufferSize = 30,
-
-                // Ключевые параметры
-                ChangedBlocksRatioThreshold = 0.01,  // 1.5% (около 130 блоков)
-                SigmaThreshold = 2.5,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
-
-                MinFramesBeforeDetection = 10,
-                StatsRecalculationPeriod = 30,
-
-                // Фильтры
-                EnableSpikeFilter = true,
-                MinMotionDuration = 4,                // 2 кадра подряд для подтверждения
-                MaxGlobalBrightnessChange = 50
-            };
-
-            bool hasMotion = false;
-            var detector = new AdaptiveMotionDetector(settings, serviceProvider.GetRequiredService<ILogger<AdaptiveMotionDetector>>());
-            rtspViewer.FrameReceived += async (rgbBytes, RtpTimestamp) =>
-            {
-                var result = detector.DetectMotion(rgbBytes, RtpTimestamp);
-                //if (result.HasMotion && !hasMotion)
-                //{
-                //    logger.LogInformation("Есть вдижение");
-                //}
-                //else if (!result.HasMotion && hasMotion)
-                //{
-                //    logger.LogInformation("Движение остановлено");
-                //}
-                //hasMotion = result.HasMotion;
-
-                //logger.LogInformation($"работа детектора {result.ProcessingTimeMs} ms");
-            };
+            rtspMotionDetector.MotionDetected += () => recorder.StartRecord();
+            rtspMotionDetector.MotionEnded += () => recorder.StopRecordAsync();
 
             recorder.Start();
-            rtspViewer.Start();
+            rtspMotionDetector.Start();
 
             Console.WriteLine("Press ENTER to exit");
             Stopwatch stopwatch = new Stopwatch();

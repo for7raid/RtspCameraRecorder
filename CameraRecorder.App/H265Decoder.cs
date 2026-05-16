@@ -6,7 +6,7 @@ using System.Collections.Concurrent;
 
 namespace CameraRecorderAndroidApp;
 
-public class H265Decoder :IH26xDecoder, IDisposable
+public class H265Decoder : IDisposable, IH26xDecoder
 {
     private MediaCodec _codec;
     private readonly object _lockObject = new object();

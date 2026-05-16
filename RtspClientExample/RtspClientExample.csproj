@@ -5,6 +5,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Nullable>enable</Nullable>
     <UserSecretsId>697624a5-a246-43e2-99c7-91c389e7e379</UserSecretsId>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />

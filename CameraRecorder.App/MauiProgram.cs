@@ -1,5 +1,6 @@
 ﻿using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
+using CameraRecorderAndroidApp;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -46,8 +47,12 @@ namespace CameraRecorder.App
             builder.Services.AddTransient<RingBufferAudioStorage>();
             builder.Services.AddTransient<RTSPClient>();
             builder.Services.AddTransient<RtspRecorder>();
-            builder.Services.AddTransient<RtspViewer>();
+            builder.Services.AddTransient<RtspMotionDetector>();
             builder.Services.AddTransient<IMp4Logger, Mp4Logger>();
+
+#if ANDROID
+            builder.Services.AddTransient<IH26xDecoder>((sp) => { return new H265Decoder(640, 480); });
+#endif
 
             builder.Services.AddTransient<IStorageSink, Sinks.LocalFileSink>();
             builder.Services.AddTransient<IStorageSink, FtpSink>();
@@ -60,7 +65,7 @@ namespace CameraRecorder.App
                     .AddFilter("RtspClientExample", LogLevel.Debug)
                     .AddFilter("Rtsp", LogLevel.Debug)
                     .AddFilter("CameraRecorder.MotionAnalyzer_", LogLevel.Debug);
-                    //.AddFile(Path.Combine(FileSystem.AppDataDirectory, "logs", $"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}-{Environment.OSVersion}.txt"));
+                //.AddFile(Path.Combine(FileSystem.AppDataDirectory, "logs", $"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}-{Environment.OSVersion}.txt"));
             });
 
             //var configuration = new ConfigurationBuilder()
