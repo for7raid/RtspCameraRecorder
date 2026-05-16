@@ -1,6 +1,7 @@
 ﻿
 using Microsoft.Extensions.Logging;
 namespace CameraRecorder.MotionAnalyzers;
+
 public enum PixelFormat
 {
     RGB,     // 3 байта: R,G,B
@@ -165,7 +166,7 @@ public class AdaptiveMotionDetector
     // ── Helper: index = row * _blocksPerRow + col ──
     private int Idx(int row, int col) => row * _blocksPerRow + col;
 
-    int[] _pixelToBlockMap;
+    ushort[] _pixelToBlockMap;
     int[][] _colrowToPixelMap;
 
     public AdaptiveMotionDetector(MotionDetectorSettings settings, ILogger<AdaptiveMotionDetector> logger)
@@ -190,14 +191,14 @@ public class AdaptiveMotionDetector
         };
 
         _totalBytes = _settings.Width * _settings.Height * _bytesPerPixel;
-        _pixelToBlockMap = new int[_totalBytes];
+        _pixelToBlockMap = new ushort[_totalBytes];
         for (int i = 0; i < _totalBytes; i += _bytesPerPixel)
         {
             int p = i / _bytesPerPixel;
             int y = p / _settings.Width;
             int x = p - y * _settings.Width;
             int idx = (y / _settings.BlockSize) * _blocksPerRow + (x / _settings.BlockSize);
-            _pixelToBlockMap[i] = idx;
+            _pixelToBlockMap[i] = (ushort)idx;
         }
 
         _colrowToPixelMap = new int[_blocksPerCol][];
@@ -234,26 +235,41 @@ public class AdaptiveMotionDetector
         };
     }
 
+    int[] _brightnessblockSums;
+    byte[] _brightnessMap;
     /// <summary>
     /// Получение одномерной карты яркости блоков (row-major)
     /// </summary>
     private byte[] GetBlockBrightnessMap(byte[] imageData)
     {
-        var blockSums = new int[_totalBlocks];
+        if (_brightnessblockSums == null)
+        {
+            _brightnessblockSums = new int[_totalBlocks];
+        }
+        else
+        {
+            Array.Clear(_brightnessblockSums, 0, _totalBlocks);
+        }
+
+        if (_brightnessMap == null)
+        {
+            _brightnessMap = new byte[_totalBlocks];
+        }
+
         int w = _settings.Width, h = _settings.Height, bs = _settings.BlockSize;
         int blockSquare = bs * bs;
 
         for (int i = 0; i < _totalBytes; i += _bytesPerPixel)
         {
             var block = _pixelToBlockMap[i];
-            blockSums[block] += _getBrightness(imageData, i);
+            _brightnessblockSums[block] += imageData[i];//_getBrightness(imageData, i);
         }
 
-        var brightnessMap = new byte[_totalBlocks];
+        
         int count = bs * bs;
         for (int i = 0; i < _totalBlocks; i++)
-            brightnessMap[i] = (byte)(blockSums[i] / count);
-        return brightnessMap;
+            _brightnessMap[i] = (byte)(_brightnessblockSums[i] / count);
+        return _brightnessMap;
     }
 
 
@@ -313,7 +329,7 @@ public class AdaptiveMotionDetector
     /// <summary>
     /// Получение фоновой карты (медианный фильтр или адаптивный фон)
     /// </summary>
-    private byte[] GetBackgroundMap()
+    internal byte[] GetBackgroundMap()
     {
 
         if (_frameBuffer.Length < 3)
@@ -344,6 +360,38 @@ public class AdaptiveMotionDetector
 
         return medianBackground;
     }
+
+    // ── EMA-вариант фона (быстрее, без буфера кадров) ──
+    private double[] _emaBackground;
+    private byte[] _emaBgOut;
+
+    /// <summary>
+    /// Экспоненциальное скользящее среднее фона.
+    /// Не требует буфера кадров — обновляется каждый вызов.
+    /// Вызывать ДО добавления текущего кадра в буфер.
+    /// </summary>
+    internal byte[] GetBackgroundMapEMA(byte[] currentMap, double alpha = 0.05)
+    {
+        if (_emaBackground == null)
+        {
+            _emaBackground = new double[_totalBlocks];
+            for (int i = 0; i < _totalBlocks; i++)
+                _emaBackground[i] = currentMap[i];
+            _emaBgOut = new byte[_totalBlocks];
+        }
+        else
+        {
+            double invAlpha = 1.0 - alpha;
+            for (int i = 0; i < _totalBlocks; i++)
+                _emaBackground[i] = _emaBackground[i] * invAlpha + currentMap[i] * alpha;
+        }
+
+        for (int i = 0; i < _totalBlocks; i++)
+            _emaBgOut[i] = (byte)Math.Round(_emaBackground[i]);
+
+        return _emaBgOut;
+    }
+
 
     /// <summary>
     /// Сравнение двух карт яркости
@@ -481,14 +529,14 @@ public class AdaptiveMotionDetector
                 $"Ожидается: {_settings.Width * _settings.Height * _bytesPerPixel}, получено: {rgbaData.Length}");
         }
 
-        // Получаем эталонный фон
-        byte[] background = GetBackgroundMap();
 
         // Получаем карту яркости
         var currentMap = GetBlockBrightnessMap(rgbaData);
 
+        // Получаем эталонный фон
+        byte[] background = GetBackgroundMapEMA(currentMap);
         // Добавляем в буфер
-        _frameBuffer.Add(currentMap);
+        //_frameBuffer.Add(currentMap);
 
         _framesProcessed++;
 
@@ -552,6 +600,7 @@ public class AdaptiveMotionDetector
         _noiseLevelHistory.Clear();
         _brightnessStdDevHistory.Clear();
         _currentLightingStats = null;
+        _emaBackground = null;
         _framesProcessed = 0;
         _framesSinceLastStats = 0;
         _consecutiveMotionFrames = 0;
