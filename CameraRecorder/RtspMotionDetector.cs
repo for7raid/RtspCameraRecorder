@@ -14,10 +14,15 @@ public class RtspMotionDetector
     private readonly IOptions<CameraRecorderSettings> _options;
     private readonly AdaptiveMotionDetector _detector;
     private const string ProfileH264 = "H264";
+    private const string ProfileH265 = "H265";
 
     public event Action<byte[], ulong>? FrameReceived;
     public event Action? MotionDetected;
     public event Action? MotionEnded;
+    public event Action<string>? DetectionLog;
+
+
+
     private DateTime? _lastMotionTime;
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
     public RtspMotionDetector(ILoggerFactory loggerFactory,
@@ -55,6 +60,7 @@ public class RtspMotionDetector
         _detector = new(settings, _loggerFactory.CreateLogger<AdaptiveMotionDetector>());
 
         client.SetupVideoPayload(ProfileH264, ReceivedVideoData_H264);
+        client.SetupVideoPayload(ProfileH265, ReceivedVideoData_H265);
 
         _client.SetupMessageCompleted += (_, _) =>
         {
@@ -63,6 +69,7 @@ public class RtspMotionDetector
         };
 
         _h26XDecoder.FrameDecoded += _h26XDecoder_FrameDecoded;
+
 
         Task.Run(MotionTimer);
     }
@@ -91,6 +98,7 @@ public class RtspMotionDetector
     private void _h26XDecoder_FrameDecoded(object? sender, DecodedFrameEventArgs e)
     {
         var motion = _detector.DetectMotion(e.Frame.Data, (ulong)e.Frame.TimestampUs);
+        DetectionLog?.Invoke(motion.ToString());
         if (motion.HasMotion)
         {
             _lastMotionTime = DateTime.Now;
@@ -119,12 +127,27 @@ public class RtspMotionDetector
             }
         }
     }
+    void ReceivedVideoData_H265(RTSPClient client, SimpleDataEventArgs dataArgs)
+    {
+        foreach (var nalUnitMem in dataArgs.Data)
+        {
+            var nalUnit = nalUnitMem.Span;
+            if (nalUnit.Length > 5)
+            {
+                var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
+
+                _h26XDecoder.DecodeFrame(nalUnitMem.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
+
+                _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
+            }
+        }
+    }
     public void Start()
     {
         _client.Stop();
-        if (!string.IsNullOrWhiteSpace(_options.Value.RtspMainStreamUrl))
+        if (!string.IsNullOrWhiteSpace(_options.Value.RtspSubStreamUrl))
         {
-            _client.Connect("rtsp://192.168.1.8:554/stream2", _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+            _client.Connect(_options.Value.RtspSubStreamUrl, _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
         }
     }
 }

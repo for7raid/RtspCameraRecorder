@@ -1,10 +1,12 @@
 ﻿using CameraRecorder;
 using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
+using CameraRecorderAndroidApp.Sinks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Serilog;
 using SharpMP4.Common;
 
 namespace CameraRecorderAndroidApp.Services
@@ -25,8 +27,10 @@ namespace CameraRecorderAndroidApp.Services
             services.AddTransient<RtspMotionDetector>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
 
-            services.AddTransient<IStorageSink, LocalFileSink_>();
+            services.AddTransient<IStorageSink, LocalFileSink>();
             services.AddTransient<IStorageSink, FtpSink>();
+
+            services.AddSingleton<IH26xDecoder>((sp) => { return new H265Decoder(640, 480, sp.GetRequiredService<ILogger<H265Decoder>>()); });
 
             services.AddLogging(builder =>
             {
@@ -37,19 +41,27 @@ namespace CameraRecorderAndroidApp.Services
                     .AddFilter("Rtsp", LogLevel.Debug)
                     //.AddFilter("CameraRecorder.MotionAnalyzers.MotionDetectionResult", LogLevel.Debug)
                     .AddDebug()
-                    //.AddSimpleConsole(o =>
-                    //{
-                    //    o.SingleLine = false;
-                    //})
-                    //.AddFile($@"C:\temp\camera\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt")
+                    //.AddFile(Path.Combine(Application.Context.FilesDir!.AbsolutePath, $@"\logs\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"), fileSizeLimitBytes: 1_048_576 /*1Mb*/)
                     ;
+
+                var log = new LoggerConfiguration()
+                    .WriteTo.File(
+                        path: Path.Combine(Application.Context.FilesDir!.AbsolutePath, $@"\logs\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"), 
+                        rollingInterval: RollingInterval.Infinite,
+                        rollOnFileSizeLimit: true,
+                        fileSizeLimitBytes: 1_048_576/*1Mb*/,
+                        buffered: true,
+                        flushToDiskInterval: TimeSpan.FromSeconds(3))
+                    .CreateLogger();
+                builder.AddSerilog(log);
+
             });
 
-            var configuration = new ConfigurationBuilder()
-                    .AddJsonFile("camerarecorder.settings.json", optional: true, reloadOnChange: true)
-                    .Build();
-            services.AddSingleton<IConfiguration>(configuration);
-            services.AddOptions();
+            //var configuration = new ConfigurationBuilder()
+            //        .AddJsonFile("camerarecorder.settings.json", optional: true, reloadOnChange: true)
+            //        .Build();
+            //services.AddSingleton<IConfiguration>(configuration);
+            //services.AddOptions();
 
 
             //services.AddTransient(sp => Options.Create(CameraRecorderSettings.Default));

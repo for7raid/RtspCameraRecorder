@@ -2,11 +2,12 @@
 using Android.Media;
 using CameraRecorder;
 using Java.Nio;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
 namespace CameraRecorderAndroidApp;
 
-public class H265Decoder :IH26xDecoder, IDisposable
+public class H265Decoder : IH26xDecoder, IDisposable
 {
     private MediaCodec _codec;
     private readonly object _lockObject = new object();
@@ -28,16 +29,18 @@ public class H265Decoder :IH26xDecoder, IDisposable
     // Параметры видео
     private readonly int _width;
     private readonly int _height;
+    private readonly ILogger<H265Decoder> _logger;
 
     /// <summary>
     /// Событие возникает при декодировании нового кадра
     /// </summary>
     public event EventHandler<DecodedFrameEventArgs> FrameDecoded;
 
-    public H265Decoder(int width, int height)
+    public H265Decoder(int width, int height, ILogger<H265Decoder> logger)
     {
         _width = width;
         _height = height;
+        _logger = logger;
     }
 
     /// <summary>
@@ -57,7 +60,7 @@ public class H265Decoder :IH26xDecoder, IDisposable
                 // Проверяем поддержку H.265
                 if (!IsHevcSupported())
                 {
-                    Console.WriteLine("H.265 не поддерживается аппаратно на этом устройстве");
+                    _logger.LogWarning("H.265 не поддерживается аппаратно на этом устройстве.");
                     return false;
                 }
 
@@ -81,12 +84,12 @@ public class H265Decoder :IH26xDecoder, IDisposable
                 _inputThread.Start();
                 _outputThread.Start();
 
-                Console.WriteLine($"Декодер H.265 инициализирован: {_width}x{_height}");
+                _logger.LogInformation($"Декодер H.265 инициализирован: {_width}x{_height}.");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка инициализации декодера: {ex.Message}");
+                _logger.LogError(ex, $"Ошибка инициализации декодера.");
                 return false;
             }
         }
@@ -192,7 +195,7 @@ public class H265Decoder :IH26xDecoder, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Ошибка в InputLoop: {ex.Message}");
+                    _logger.LogError(ex, $"Ошибка в InputLoop.");
                 }
             }
         }
@@ -201,7 +204,7 @@ public class H265Decoder :IH26xDecoder, IDisposable
     /// <summary>
     /// Цикл получения декодированных данных
     /// </summary>
-    private void OutputLoop()
+    private async void OutputLoop()
     {
         var bufferInfo = new MediaCodec.BufferInfo();
 
@@ -242,6 +245,9 @@ public class H265Decoder :IH26xDecoder, IDisposable
                             //Image = outputImage,
                         };
 
+                        decodedFrame.Data = decodedFrame.ToY();
+                        decodedFrame.Format = "Y";
+
                         // Вызываем событие в UI потоке (или в потоке декодера)
                         OnFrameDecoded(decodedFrame);
                     }
@@ -251,13 +257,13 @@ public class H265Decoder :IH26xDecoder, IDisposable
                 }
                 else if (outputIndex == (int)MediaCodecInfoState.TryAgainLater)
                 {
-                    // Нет данных, ждём
-                    Thread.Sleep(1);
+                    await Task.Delay(1);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка в OutputLoop: {ex.Message}");
+                _logger.LogError(ex, $"Ошибка в OutputLoop.");
+
             }
         }
     }
@@ -326,7 +332,7 @@ public class H265Decoder :IH26xDecoder, IDisposable
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка при остановке: {ex.Message}");
+                _logger.LogError(ex, $"Ошибка при остановке.");
             }
 
             _codec = null;

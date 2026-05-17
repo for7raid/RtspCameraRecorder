@@ -72,7 +72,7 @@ public partial class SettingsPageModel : ObservableObject
             IsLoading = true;
             var settings = await _storage.LoadAsync();
 
-            RtspUrl = settings.RtspUrl;
+            RtspUrl = settings.RtspMainStreamUrl;
             RtspLogin = settings.RtspLogin;
             RtspPassword = settings.RtspPassword;
             LocalStorageEnabled = settings.LocalStorageEnabled;
@@ -101,7 +101,7 @@ public partial class SettingsPageModel : ObservableObject
 
             var settings = new CameraRecorderSettings
             {
-                RtspUrl = RtspUrl,
+                RtspMainStreamUrl = RtspUrl,
                 RtspLogin = RtspLogin,
                 RtspPassword = RtspPassword,
                 LocalStorageEnabled = LocalStorageEnabled,

@@ -11,8 +11,27 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:text="Настройки" />
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+    <Button
+      android:id="@+id/btnStartRecord"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:text="Начать запись" />
+    <Button
+      android:id="@+id/btnStopRecord"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:text="Остановить запись" />
+  </LinearLayout>
+
   <TextView
-    android:id="@+id/textView1"
+    android:id="@+id/txtRecordingStatus"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:layout_centerInParent="true"

@@ -1,5 +1,6 @@
 using CameraRecorder.Settings;
 using CameraRecorderAndroidApp.Services;
+using Java.Nio.FileNio;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CameraRecorderAndroidApp;
@@ -32,6 +33,12 @@ public class SettingsActivity : Activity
         etRtspPassword = FindViewById<EditText>(Resource.Id.etRtspPassword)!;
         swLocalEnabled = FindViewById<Switch>(Resource.Id.swLocalStorageEnabled)!;
         etLocalPath = FindViewById<EditText>(Resource.Id.etLocalRecordingsPath)!;
+        var btnPickFolder = FindViewById<Button>(Resource.Id.btnPickFolder)!;
+        btnPickFolder.Click += (_, _) =>
+        {
+            var intent = new Android.Content.Intent(Android.Content.Intent.ActionOpenDocumentTree);
+            StartActivityForResult(intent, 42);
+        };
         swFtpEnabled = FindViewById<Switch>(Resource.Id.swFtpEnabled)!;
         etFtpHost = FindViewById<EditText>(Resource.Id.etFtpHost)!;
         etFtpLogin = FindViewById<EditText>(Resource.Id.etFtpLogin)!;
@@ -55,6 +62,7 @@ public class SettingsActivity : Activity
         // Save
         btnSave.Click += async (_, _) =>
         {
+            //File.WriteAllText(etLocalPath?.Text + "/log.txt", "hello!");
             await _settingsStorage.SaveAsync(Collect());
             Toast.MakeText(this, "Настройки сохранены", ToastLength.Short)!.Show();
             Finish();
@@ -79,6 +87,30 @@ public class SettingsActivity : Activity
         sbPostMotion.Progress = s.PostMotionDurationSec;
         tvPreMotion.Text = s.PreMotionDurationSec.ToString();
         tvPostMotion.Text = s.PostMotionDurationSec.ToString();
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Android.Content.Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == 42 && resultCode == Result.Ok && data?.Data != null)
+        {
+
+            var uri = data.Data;
+            var path = Android.Net.Uri.Decode(uri.LastPathSegment ?? "");
+            if (path.StartsWith("primary:"))
+                path = path.Substring("primary:".Length);
+            if (path.StartsWith("/tree/"))
+                path = path.Substring("/tree/".Length);
+            
+
+            if (!OperatingSystem.IsAndroidVersionAtLeast(29))
+            {
+                path = System.IO.Path.Combine(Android.OS.Environment.ExternalStorageDirectory!.AbsolutePath, path);
+            }
+
+            if (etLocalPath != null)
+                etLocalPath.Text = path.TrimEnd('/');
+        }
     }
 
     private CameraRecorderSettings Collect()
