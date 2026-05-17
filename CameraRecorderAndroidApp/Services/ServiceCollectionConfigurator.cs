@@ -17,6 +17,9 @@ namespace CameraRecorderAndroidApp.Services
 
         static ServiceCollectionConfigurator()
         {
+            string logsDir = Path.Combine(Android.App.Application.Context.FilesDir!.AbsolutePath, "logs");
+            Directory.CreateDirectory(logsDir);
+
             var services = new ServiceCollection();
 
 
@@ -46,7 +49,7 @@ namespace CameraRecorderAndroidApp.Services
 
                 var log = new LoggerConfiguration()
                     .WriteTo.File(
-                        path: Path.Combine(Application.Context.FilesDir!.AbsolutePath, $@"\logs\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"), 
+                        path: Path.Combine(logsDir, $@"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"),
                         rollingInterval: RollingInterval.Infinite,
                         rollOnFileSizeLimit: true,
                         fileSizeLimitBytes: 1_048_576/*1Mb*/,

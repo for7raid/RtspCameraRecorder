@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:padding="8dp">
+
+    <TextView
+        android:id="@+id/tvLogFile"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Логи"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/btnPrev"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:text="◀" />
+
+    <Button
+        android:id="@+id/btnNext"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:text="▶" />
+
+    <Button
+        android:id="@+id/btnDelete"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:text="🗑" />
+  </LinearLayout>
+
+  <ScrollView
+      android:layout_width="match_parent"
+      android:layout_height="match_parent">
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+      <TextView
+          android:id="@+id/tvLogContent"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:padding="8dp"
+          android:textSize="10sp"
+          android:fontFamily="monospace"
+          android:text="" />
+
+    </HorizontalScrollView>
+  </ScrollView>
+</LinearLayout>

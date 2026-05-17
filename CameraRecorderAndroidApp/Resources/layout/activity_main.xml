@@ -12,6 +12,12 @@
     android:layout_height="wrap_content"
     android:text="Настройки" />
 
+  <Button
+    android:id="@+id/btnLogs"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Логи" />
+
   <LinearLayout
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

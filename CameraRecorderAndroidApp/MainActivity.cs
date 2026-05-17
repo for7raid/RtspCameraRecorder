@@ -19,7 +19,7 @@ namespace CameraRecorderAndroidApp
 
         public MainActivity()
         {
-
+           
 
 
             // Строим провайдер
@@ -68,6 +68,9 @@ namespace CameraRecorderAndroidApp
 
             var btnSettings = FindViewById<Button>(Resource.Id.btnSettings);
             btnSettings!.Click += (_, _) => StartActivity(new Android.Content.Intent(this, typeof(SettingsActivity)));
+
+            var btnLogs = FindViewById<Button>(Resource.Id.btnLogs);
+            btnLogs!.Click += (_, _) => StartActivity(new Android.Content.Intent(this, typeof(LogsActivity)));
 
             var btnStart = FindViewById<Button>(Resource.Id.btnStartRecord)!;
             btnStart.Click += (_, _) => _rtspRecorder.StartRecord();
