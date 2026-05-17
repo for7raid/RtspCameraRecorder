@@ -1,5 +1,6 @@
 ﻿using CameraRecorder.MotionAnalyzers;
 using CameraRecorder.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -27,7 +28,7 @@ public class RtspMotionDetector
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
     public RtspMotionDetector(ILoggerFactory loggerFactory,
         RTSPClient client,
-        IH26xDecoder h26XDecoder,
+        [FromKeyedServices("OnBufferDecoder")] IH26xDecoder h26XDecoder,
         IOptions<CameraRecorderSettings> options)
     {
         _loggerFactory = loggerFactory;
@@ -97,7 +98,7 @@ public class RtspMotionDetector
 
     private void _h26XDecoder_FrameDecoded(object? sender, DecodedFrameEventArgs e)
     {
-        var motion = _detector.DetectMotion(e.Frame.Data, (ulong)e.Frame.TimestampUs);
+        var motion = _detector.DetectMotion(e.Frame.ToY(), (ulong)e.Frame.TimestampUs);
         DetectionLog?.Invoke(motion.ToString());
         if (motion.HasMotion)
         {

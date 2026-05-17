@@ -1,5 +1,6 @@
 ﻿using CameraRecorder.MotionAnalyzers;
 using CameraRecorder.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,7 @@ public class RtspRecorder
     private readonly ILoggerFactory _loggerFactory;
     private readonly RTSPClient _client;
     private readonly RingBufferAudioStorage _bufferAudioStorage;
+    private readonly IH26xDecoder _h26XDecoder;
     private readonly IOptions<CameraRecorderSettings> _options;
     private readonly RingBufferVideoStorage _bufferVideoStorage;
     private const string ProfileH264 = "H264";
@@ -51,11 +53,13 @@ public class RtspRecorder
         RTSPClient client,
         RingBufferVideoStorage bufferVideoStorage,
         RingBufferAudioStorage bufferAudioStorage,
+        [FromKeyedServices("OnScreenDecoder")] IH26xDecoder? h26XDecoder,
         IOptions<CameraRecorderSettings> options)
     {
         _loggerFactory = loggerFactory;
         _client = client;
         _bufferAudioStorage = bufferAudioStorage;
+        _h26XDecoder = h26XDecoder;
         _options = options;
         _bufferVideoStorage = bufferVideoStorage;
         _logger = _loggerFactory.CreateLogger<RtspRecorder>();
@@ -119,7 +123,7 @@ public class RtspRecorder
                 var nal_unit_type = (NalUnitType)(nalUnit[4] & 0x1F);
                 var unit = nalUnitMem.Slice(5);
                 _bufferVideoStorage.AddFrame(unit, nal_unit_type);
-                //_motionAnalyzer.Append(unit.ToArray());
+                _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
             }
         }
@@ -136,7 +140,7 @@ public class RtspRecorder
                 var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
                 var unit = nalUnitMem.Slice(4);
                 _bufferVideoStorage.AddFrame(unit, nal_unit_type);
-
+                _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
 
                 if (_isRecording)

@@ -1,5 +1,6 @@
 ﻿using Android.Graphics;
 using Android.Media;
+using Android.Views;
 using CameraRecorder;
 using Java.Nio;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,7 @@ public class H265Decoder : IH26xDecoder, IDisposable
     private readonly int _width;
     private readonly int _height;
     private readonly ILogger<H265Decoder> _logger;
+    Surface? _surface;
 
     /// <summary>
     /// Событие возникает при декодировании нового кадра
@@ -46,7 +48,7 @@ public class H265Decoder : IH26xDecoder, IDisposable
     /// <summary>
     /// Инициализация и запуск декодера
     /// </summary>
-    public bool Initialize()
+    public bool Initialize(Surface? surface = null)
     {
         lock (_lockObject)
         {
@@ -64,6 +66,8 @@ public class H265Decoder : IH26xDecoder, IDisposable
                     return false;
                 }
 
+                _surface = surface;
+
                 // Создаём декодер
                 _codec = MediaCodec.CreateDecoderByType(MediaFormat.MimetypeVideoHevc);
 
@@ -71,7 +75,7 @@ public class H265Decoder : IH26xDecoder, IDisposable
                 MediaFormat format = MediaFormat.CreateVideoFormat(MediaFormat.MimetypeVideoHevc, _width, _height);
 
                 // Важно: передаём null вместо Surface - декодируем в буферы
-                _codec.Configure(format, null, null, MediaCodecConfigFlags.None);
+                _codec.Configure(format, surface, null, MediaCodecConfigFlags.None);
 
                 // Запускаем декодер
                 _codec.Start();
@@ -100,10 +104,50 @@ public class H265Decoder : IH26xDecoder, IDisposable
     /// </summary>
     private bool IsHevcSupported()
     {
+        //CheckH265ConcurrencyLimit();
         var codecList = new MediaCodecList(MediaCodecListKind.AllCodecs);
         var format = MediaFormat.CreateVideoFormat(MediaFormat.MimetypeVideoHevc, _width, _height);
         string codecName = codecList.FindDecoderForFormat(format);
         return codecName != null;
+    }
+
+
+    public static void CheckH265ConcurrencyLimit()
+    {
+        // 1. Получаем список всех кодеков на устройстве
+        var codecList = new MediaCodecList(MediaCodecListKind.AllCodecs);
+        var hevcCodecs = codecList.GetCodecInfos()
+        .Where(codecInfo => codecInfo.IsEncoder == false) // Нам нужен ДЕкодер
+        .Where(codecInfo => codecInfo.GetSupportedTypes().Contains("video/hevc"))
+        .ToList();
+
+        if (!hevcCodecs.Any())
+        {
+            Console.WriteLine("H.265 декодер не найден на этом устройстве");
+            return;
+        }
+
+        Console.WriteLine($"Найдено {hevcCodecs.Count} кодек(ов) для H.265");
+
+        foreach (var codecInfo in hevcCodecs)
+        {
+            // 2. Получаем возможности (Capabilities) для этого кодека
+            var capabilities = codecInfo.GetCapabilitiesForType("video/hevc");
+
+            // 3. Пытаемся прочитать максимальное количество поддерживаемых инстансов
+            // Некоторые старые версии Android могут возвращать 0, если лимит не задан явно
+            int maxInstances = capabilities.MaxSupportedInstances;
+
+            if (maxInstances > 0)
+            {
+                Console.WriteLine($"Кодек '{codecInfo.Name}' поддерживает максимум {maxInstances} одновременных экземпляров");
+            }
+            else
+            {
+                // Если метод вернул 0, это обычно означает "без ограничений" или "очень много"
+                Console.WriteLine($"Кодек '{codecInfo.Name}' не имеет жесткого лимита (или версия Android старая)");
+            }
+        }
     }
 
     /// <summary>
@@ -219,7 +263,7 @@ public class H265Decoder : IH26xDecoder, IDisposable
                     // Получаем выходной буфер с декодированными данными
                     ByteBuffer outputBuffer = _codec.GetOutputBuffer(outputIndex);
 
-                    if (outputBuffer != null && bufferInfo.Size > 0)
+                    if (outputBuffer != null && bufferInfo.Size > 8)
                     {
                         // Копируем данные из буфера
                         byte[] decodedData = new byte[bufferInfo.Size];
@@ -245,15 +289,13 @@ public class H265Decoder : IH26xDecoder, IDisposable
                             //Image = outputImage,
                         };
 
-                        decodedFrame.Data = decodedFrame.ToY();
-                        decodedFrame.Format = "Y";
-
                         // Вызываем событие в UI потоке (или в потоке декодера)
                         OnFrameDecoded(decodedFrame);
                     }
 
-                    // Освобождаем буфер (false = не выводить на Surface)
-                    _codec.ReleaseOutputBuffer(outputIndex, false);
+                    _codec.ReleaseOutputBuffer(outputIndex, _surface != null);
+
+
                 }
                 else if (outputIndex == (int)MediaCodecInfoState.TryAgainLater)
                 {
