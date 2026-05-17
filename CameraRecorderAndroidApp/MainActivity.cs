@@ -42,7 +42,7 @@ namespace CameraRecorderAndroidApp
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {
                 string text = duration != TimeSpan.Zero
-                    ? ((int)duration.TotalSeconds % 2 == 0 ? "🔴" : "⚫") + duration.ToString(@" hh\:mm\:ss")
+                    ? ((int)duration.TotalSeconds % 2 == 0 ? "🔴 " : "⚫ ") + duration.ToString(@"hh\:mm\:ss")
                     : string.Empty;
                 RunOnUiThread(() => { txtRecordingStatus!.Text = text; });
             };
