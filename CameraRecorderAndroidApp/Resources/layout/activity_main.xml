@@ -1,67 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center">
-  <Button
-    android:id="@+id/btnSettings"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Настройки" />
-
-  <Button
-    android:id="@+id/btnLogs"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Логи" />
-
-  <LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal">
-    <Button
-      android:id="@+id/btnStartRecord"
-      android:layout_width="0dp"
-      android:layout_height="wrap_content"
-      android:layout_weight="1"
-      android:text="Начать запись" />
-    <Button
-      android:id="@+id/btnStopRecord"
-      android:layout_width="0dp"
-      android:layout_height="wrap_content"
-      android:layout_weight="1"
-      android:text="Остановить запись" />
-  </LinearLayout>
-
-  <TextView
-    android:id="@+id/txtRecordingStatus"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_centerInParent="true"
-      android:text="@string/app_text"
-    />
-
-  <TextView
-     android:id="@+id/textView2"
-       android:layout_width="wrap_content"
-       android:layout_height="wrap_content"
-       android:layout_centerInParent="true"
-       android:text="@string/app_text"
-    />
-  <TextView
-    android:id="@+id/textView3"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_centerInParent="true"
-      android:text="@string/app_text"
-    />
-
+    android:layout_height="match_parent">
 
   <SurfaceView
-    android:id="@+id/surfaceView1"
-    android:layout_width="640px"
-    android:layout_height="480px"/>
-</LinearLayout>
+      android:id="@+id/surfaceView1"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent" />
+
+  <ImageButton
+      android:id="@+id/btnMenu"
+      android:layout_width="48dp"
+      android:layout_height="48dp"
+      android:layout_gravity="start|top"
+      android:layout_margin="8dp"
+      android:background="?android:attr/selectableItemBackgroundBorderless"
+      android:src="@android:drawable/ic_menu_sort_by_size"
+      android:contentDescription="Меню" />
+
+  <TextView
+      android:id="@+id/txtRecordingStatus"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="end|top"
+      android:layout_margin="12dp"
+      android:layout_marginEnd="64dp"
+      android:textSize="14sp"
+      android:textColor="#FFFF0000"
+      android:shadowColor="#000000"
+      android:shadowRadius="4"
+      android:text="" />
+  
+  <Button
+    android:id="@+id/btnStartRecord"
+    android:layout_width="40dp"
+    android:layout_height="40dp"
+    android:layout_gravity="end|center"
+    android:layout_margin="8dp"
+    android:contentDescription="Начать запись запись"
+    android:background="@android:color/transparent"
+    android:textColor="@android:color/holo_red_dark"
+    android:text="●"
+    android:textSize="24sp"
+    android:visibility="visible" />
+
+  <Button
+      android:id="@+id/btnStopRecord"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:layout_gravity="end|center"
+      android:layout_margin="8dp"
+      android:contentDescription="Остановить запись"
+      android:background="@android:color/transparent"
+      android:textColor="@android:color/black"
+      android:text="⏸️"
+      android:textSize="24sp"
+      android:visibility="gone" />
+
+  <TextView
+      android:id="@+id/txtMotionLog"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_gravity="bottom"
+      android:padding="8dp"
+      android:textSize="11sp"
+      android:textColor="#FFFFFF"
+      android:background="#99000000"
+      android:maxLines="3"
+      android:text="" />
+
+</FrameLayout>

@@ -99,7 +99,7 @@ public class LightingStats
 
     public override string ToString()
     {
-        return $"Global={GlobalBrightness:F1}, Noise={NoiseLevel:F1}, BrightnessStdDev={BrightnessStdDev:F1}, Threshold={AdaptiveThreshold:F1}";
+        return $"Global={GlobalBrightness:F0}, Noise={NoiseLevel:F1}, BrightnessStdDev={BrightnessStdDev:F0}, Threshold={AdaptiveThreshold:F0}";
     }
 }
 
@@ -123,8 +123,8 @@ public class MotionDetectionResult
     public override string ToString()
     {
         return $"[{RtpTimestamp}] [{ProcessingTimeMs:0.00} ms] Motion: {(HasMotion ? "YES" : " NO")}, " +
-               $"Changed: {ChangedBlocksCount}/{TotalBlocksCount} ({ChangedBlocksPercent:P2}), " +
-               $"AverageChangeIntensity: {AverageChangeIntensity:F1}, " +
+               $"Changed: {ChangedBlocksCount:00}/{TotalBlocksCount} ({ChangedBlocksPercent:P2}), " +
+               $"AverageChangeIntensity: {AverageChangeIntensity:00}, " +
                //$"Threshold: {CurrentThreshold}, " +
                $"Lighting: {LightingStats}";
     }

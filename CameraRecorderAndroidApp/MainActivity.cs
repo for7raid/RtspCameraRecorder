@@ -6,7 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace CameraRecorderAndroidApp
 {
-    [Activity(Label = "@string/app_name", MainLauncher = true)]
+    [Activity(Label = "@string/app_name",
+        MainLauncher = true,
+        ScreenOrientation = Android.Content.PM.ScreenOrientation.Landscape,
+        Theme = "@style/AppTheme")]
     public class MainActivity : Activity
     {
         private RtspRecorder _rtspRecorder;
@@ -14,7 +17,8 @@ namespace CameraRecorderAndroidApp
         private H265Decoder _decoderDetector;
         private readonly H265Decoder _decoderScreen;
         private TextView? txtRecordingStatus;
-        private TextView? txtView2;
+        private TextView? txtMotionLog;
+        private Button? btnStart, btnStop;
         public TextView? txtView3 { get; private set; }
         private ILogger<MainActivity> _logger;
 
@@ -30,15 +34,35 @@ namespace CameraRecorderAndroidApp
 
             _rtspMotionDetector.DetectionLog += (log) =>
             {
-                RunOnUiThread(() => { txtView2!.Text = log; });
+                RunOnUiThread(() => { txtMotionLog!.Text = log; });
             };
+            _rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
+            _rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecordAsync(); };
 
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {
                 string text = duration != TimeSpan.Zero
-                    ? ((int)duration.TotalSeconds % 2 == 0 ? "🔴" : "⚫") + duration.ToString(@"hh\:mm\:ss")
+                    ? ((int)duration.TotalSeconds % 2 == 0 ? "🔴" : "⚫") + duration.ToString(@" hh\:mm\:ss")
                     : string.Empty;
                 RunOnUiThread(() => { txtRecordingStatus!.Text = text; });
+            };
+
+            _rtspRecorder.RecordingStarted += () =>
+            {
+                RunOnUiThread(() =>
+                {
+                    if (btnStart != null) btnStart.Visibility = ViewStates.Gone;
+                    if (btnStop != null) btnStop.Visibility = ViewStates.Visible;
+                });
+            };
+
+            _rtspRecorder.RecordingStopped += () =>
+            {
+                RunOnUiThread(() =>
+                {
+                    if (btnStart != null) btnStart.Visibility = ViewStates.Visible;
+                    if (btnStop != null) btnStop.Visibility = ViewStates.Gone;
+                });
             };
         }
 
@@ -48,8 +72,8 @@ namespace CameraRecorderAndroidApp
             SetContentView(Resource.Layout.activity_main);
 
             txtRecordingStatus = FindViewById<TextView>(Resource.Id.txtRecordingStatus);
-            txtView2 = FindViewById<TextView>(Resource.Id.textView2);
-            txtView3 = FindViewById<TextView>(Resource.Id.textView3);
+            txtMotionLog = FindViewById<TextView>(Resource.Id.txtMotionLog);
+
 
             // Отрисовка напрямую аппаратным декодером → ждём готовности Surface
             var surfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1)!;
@@ -64,16 +88,27 @@ namespace CameraRecorderAndroidApp
             () => _decoderScreen.Dispose()));
 
 
-            var btnSettings = FindViewById<Button>(Resource.Id.btnSettings);
-            btnSettings!.Click += (_, _) => StartActivity(new Android.Content.Intent(this, typeof(SettingsActivity)));
+            // Бургер-меню
+            var btnMenu = FindViewById<ImageButton>(Resource.Id.btnMenu)!;
+            btnMenu.Click += (_, _) =>
+            {
+                var popup = new PopupMenu(this, btnMenu);
+                popup.Menu!.Add("Настройки");
+                popup.Menu!.Add("Логи");
+                popup.MenuItemClick += (s, e) =>
+                {
+                    if (e.Item!.TitleFormatted!.ToString() == "Настройки")
+                        StartActivity(new Android.Content.Intent(this, typeof(SettingsActivity)));
+                    else if (e.Item!.TitleFormatted!.ToString() == "Логи")
+                        StartActivity(new Android.Content.Intent(this, typeof(LogsActivity)));
+                };
+                popup.Show();
+            };
 
-            var btnLogs = FindViewById<Button>(Resource.Id.btnLogs);
-            btnLogs!.Click += (_, _) => StartActivity(new Android.Content.Intent(this, typeof(LogsActivity)));
-
-            var btnStart = FindViewById<Button>(Resource.Id.btnStartRecord)!;
+            btnStart = FindViewById<Button>(Resource.Id.btnStartRecord)!;
             btnStart.Click += (_, _) => _rtspRecorder.StartRecord();
 
-            var btnStop = FindViewById<Button>(Resource.Id.btnStopRecord)!;
+            btnStop = FindViewById<Button>(Resource.Id.btnStopRecord)!;
             btnStop.Click += async (_, _) => await _rtspRecorder.StopRecordAsync();
 
 
