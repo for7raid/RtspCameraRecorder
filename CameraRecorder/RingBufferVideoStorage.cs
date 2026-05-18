@@ -85,7 +85,6 @@ public class RingBufferVideoStorage
         lock (_lockObj)
         {
             framesToSave = _buffer.ToList();
-            _buffer.Clear();
             _isRecording = false;
         }
 

@@ -55,7 +55,6 @@ public class RtspMotionDetector
             // Фильтры
             EnableSpikeFilter = true,
             MinMotionDuration = 4,                // 2 кадра подряд для подтверждения
-            MaxGlobalBrightnessChange = 50
         };
 
         _detector = new(settings, _loggerFactory.CreateLogger<AdaptiveMotionDetector>());

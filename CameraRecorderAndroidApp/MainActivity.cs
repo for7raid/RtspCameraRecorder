@@ -21,6 +21,7 @@ namespace CameraRecorderAndroidApp
         private Button? btnStart, btnStop;
         public TextView? txtView3 { get; private set; }
         private ILogger<MainActivity> _logger;
+        private readonly LogWebServer _webServer;
 
         public MainActivity()
         {
@@ -31,6 +32,9 @@ namespace CameraRecorderAndroidApp
             _decoderDetector = (H265Decoder)serviceProvider.GetRequiredKeyedService<IH26xDecoder>("OnBufferDecoder");
             _decoderScreen = (H265Decoder)serviceProvider.GetRequiredKeyedService<IH26xDecoder>("OnScreenDecoder");
             _logger = serviceProvider.GetRequiredService<ILogger<MainActivity>>();
+            _webServer = serviceProvider.GetRequiredService<LogWebServer>();
+
+            
 
             _rtspMotionDetector.DetectionLog += (log) =>
             {
@@ -87,6 +91,7 @@ namespace CameraRecorderAndroidApp
             },
             () => _decoderScreen.Dispose()));
 
+            _webServer.Start();
 
             // Бургер-меню
             var btnMenu = FindViewById<ImageButton>(Resource.Id.btnMenu)!;

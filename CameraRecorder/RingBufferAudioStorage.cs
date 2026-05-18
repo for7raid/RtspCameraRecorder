@@ -70,7 +70,6 @@ public class RingBufferAudioStorage
         lock (_lockObj)
         {
             framesToSave = _buffer.ToList();
-            _buffer.Clear();
             _isRecording = false;
         }
 

@@ -265,7 +265,7 @@ public class AdaptiveMotionDetector
             _brightnessblockSums[block] += imageData[i];//_getBrightness(imageData, i);
         }
 
-        
+
         int count = bs * bs;
         for (int i = 0; i < _totalBlocks; i++)
             _brightnessMap[i] = (byte)(_brightnessblockSums[i] / count);
@@ -582,7 +582,11 @@ public class AdaptiveMotionDetector
         result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
         result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
 
-        _logger.LogInformation(result.ToString());
+        if (filteredMotion)
+            _logger.LogInformation(result.ToString());
+        else
+            _logger.LogDebug(result.ToString());
+
 
         return result;
     }

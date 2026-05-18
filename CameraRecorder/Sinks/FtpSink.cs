@@ -78,7 +78,7 @@ public sealed class FtpSink : IStorageSink
 
     private Uri BuildUri(CameraRecorderSettings settings, string fileName)
     {
-        var scheme = settings.UseFtps ? "ftps" : "ftp";
+        var scheme = "ftp";// settings.UseFtps ? "ftps" : "ftp";
         var host = settings.FtpHost.TrimEnd('/');
         var path = settings.FtpDirectory + (fileName.StartsWith('/') ? fileName : "/" + fileName);
         return new Uri($"{scheme}://{host}{path}");
