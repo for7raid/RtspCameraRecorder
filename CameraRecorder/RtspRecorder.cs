@@ -11,10 +11,10 @@ public class RtspRecorder
     private readonly ILogger<RtspRecorder> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly RTSPClient _client;
-    private readonly RingBufferAudioStorage _bufferAudioStorage;
     private readonly IH26xDecoder _h26XDecoder;
     private readonly IOptions<CameraRecorderSettings> _options;
-    private readonly RingBufferVideoStorage _bufferVideoStorage;
+    private readonly RingBufferStorage _bufferVideoStorage;
+    private readonly IFramesDumper _framesDumper;
     private const string ProfileH264 = "H264";
     private const string ProfileH265 = "H265";
     private const string ProfilePCMU = "PCMU";
@@ -51,17 +51,17 @@ public class RtspRecorder
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
     public RtspRecorder(ILoggerFactory loggerFactory,
         RTSPClient client,
-        RingBufferVideoStorage bufferVideoStorage,
-        RingBufferAudioStorage bufferAudioStorage,
+        RingBufferStorage bufferVideoStorage,
+        IFramesDumper framesDumper,
         [FromKeyedServices("OnScreenDecoder")] IH26xDecoder? h26XDecoder,
         IOptions<CameraRecorderSettings> options)
     {
         _loggerFactory = loggerFactory;
         _client = client;
-        _bufferAudioStorage = bufferAudioStorage;
         _h26XDecoder = h26XDecoder;
         _options = options;
         _bufferVideoStorage = bufferVideoStorage;
+        _framesDumper = framesDumper;
         _logger = _loggerFactory.CreateLogger<RtspRecorder>();
 
         _motionAnalyzer = new(VideoCodec.H265, loggerFactory.CreateLogger<MotionAnalyzer>(), MotionSensitivity.SlowHand);
@@ -88,7 +88,6 @@ public class RtspRecorder
         {
             _isRecording = true;
             _bufferVideoStorage.StartRecord();
-            _bufferAudioStorage.StartRecord();
             _logger.LogInformation("Запись началась");
             RecordingStarted?.Invoke();
         }
@@ -99,8 +98,8 @@ public class RtspRecorder
         if (_isRecording)
         {
             _isRecording = false;
-            await _bufferVideoStorage.StopRecordAsync();
-            await _bufferAudioStorage.StopRecordAsync();
+            var frames = _bufferVideoStorage.DumpAndStopRecord();
+            _framesDumper.ProcessFrames(frames.videoFrames, frames.audioFrames);
             _logger.LogInformation("Запись остановлена");
             RecordingStopped?.Invoke();
             RecordingDurationChanged?.Invoke(TimeSpan.Zero);
@@ -110,7 +109,7 @@ public class RtspRecorder
     {
         foreach (var data in dataArgs.Data)
         {
-            _bufferAudioStorage?.AddFrame(data);
+            _bufferVideoStorage?.AddAudioFrame(data, dataArgs.RtpTimestamp);
         }
     }
     void ReceivedVideoData_H264(RTSPClient client, SimpleDataEventArgs dataArgs)
@@ -122,7 +121,7 @@ public class RtspRecorder
             {
                 var nal_unit_type = (NalUnitType)(nalUnit[4] & 0x1F);
                 var unit = nalUnitMem.Slice(5);
-                _bufferVideoStorage.AddFrame(unit, nal_unit_type);
+                _bufferVideoStorage.AddVideoFrame(unit, nal_unit_type, dataArgs.RtpTimestamp);
                 _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
             }
@@ -139,7 +138,7 @@ public class RtspRecorder
             {
                 var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
                 var unit = nalUnitMem.Slice(4);
-                _bufferVideoStorage.AddFrame(unit, nal_unit_type);
+                _bufferVideoStorage.AddVideoFrame(nalUnit.ToArray(), nal_unit_type, dataArgs.RtpTimestamp);
                 _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
 

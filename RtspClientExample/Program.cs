@@ -21,7 +21,7 @@ namespace RtspClientExample
             var services = new ServiceCollection();
 
 
-            services.AddTransient<RingBufferVideoStorage>();
+            services.AddTransient<RingBufferStorage>();
             services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();

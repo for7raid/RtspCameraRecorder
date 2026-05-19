@@ -40,14 +40,23 @@ public sealed class LocalFileSink : IStorageSink
 
             if (OperatingSystem.IsAndroidVersionAtLeast(29))
             {
+
+                var mimeType = Path.GetExtension(fileName) switch
+                {
+                    ".wav" => "audio/wav",
+                    ".aac" => "audio/aac",
+                    _ => "video/mp4",
+                };
+
                 var context = Android.App.Application.Context;
                 var resolver = context.ContentResolver!;
                 Android.Content.ContentValues contentValues = new();
                 contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "video/mp4");
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, _settings.LocalRecordingsPath);
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.Data, Path.Combine(_settings.LocalRecordingsPath, fileName));
-                var imageUri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, contentValues);
+                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, mimeType);
+                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Download");
+                //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.Data, Path.Combine(_settings.LocalRecordingsPath, fileName));
+                var uri = Path.GetExtension(fileName) == ".mp4" ? Android.Provider.MediaStore.Video.Media.ExternalContentUri : Android.Provider.MediaStore.Audio.Media.ExternalContentUri;
+                var imageUri = resolver.Insert(Android.Provider.MediaStore.Downloads.ExternalContentUri, contentValues);
 
                 using var os = resolver.OpenOutputStream(imageUri);
                 await stream.CopyToAsync(os!);

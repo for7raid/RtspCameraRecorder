@@ -40,8 +40,8 @@ namespace CameraRecorderAndroidApp
             {
                 RunOnUiThread(() => { txtMotionLog!.Text = log; });
             };
-            _rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
-            _rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecordAsync(); };
+            //_rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
+            //_rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecordAsync(); };
 
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {

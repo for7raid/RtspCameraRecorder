@@ -2,7 +2,6 @@
 using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
 using CameraRecorderAndroidApp.Sinks;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,16 +21,20 @@ namespace CameraRecorderAndroidApp.Services
 
             var services = new ServiceCollection();
 
-
-            services.AddTransient<RingBufferVideoStorage>();
+            services.AddTransient<LocalFileSink>();
+            services.AddTransient<RingBufferStorage>();
             services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
             services.AddTransient<RtspMotionDetector>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
 
+            services.AddTransient<IFramesDumper, AndroidMuxedDumper>();
+
             services.AddTransient<IStorageSink, LocalFileSink>();
-            services.AddTransient<IStorageSink, FtpSink>();
+            //services.AddTransient<IStorageSink, FtpSink>();
+
+            services.AddSingleton<IWavToAACConverter, MuLawToAACConverter>();
 
             services.AddKeyedSingleton<IH26xDecoder>("OnScreenDecoder", (sp, _) => { return new H265Decoder(2650, 1440, sp.GetRequiredService<ILogger<H265Decoder>>()); });
             services.AddKeyedSingleton<IH26xDecoder>("OnBufferDecoder", (sp, _) => { return new H265Decoder(640, 480, sp.GetRequiredService<ILogger<H265Decoder>>()); });

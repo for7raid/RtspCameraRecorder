@@ -33,28 +33,28 @@
   
   <Button
     android:id="@+id/btnStartRecord"
-    android:layout_width="40dp"
-    android:layout_height="40dp"
+    android:layout_width="60dp"
+    android:layout_height="60dp"
     android:layout_gravity="end|center"
     android:layout_margin="8dp"
     android:contentDescription="Начать запись запись"
     android:background="@android:color/transparent"
     android:textColor="@android:color/holo_red_dark"
     android:text="●"
-    android:textSize="24sp"
+    android:textSize="30sp"
     android:visibility="visible" />
 
   <Button
       android:id="@+id/btnStopRecord"
-      android:layout_width="40dp"
-      android:layout_height="40dp"
+      android:layout_width="60dp"
+      android:layout_height="60dp"
       android:layout_gravity="end|center"
       android:layout_margin="8dp"
       android:contentDescription="Остановить запись"
       android:background="@android:color/transparent"
       android:textColor="@android:color/black"
       android:text="⏸️"
-      android:textSize="24sp"
+      android:textSize="30sp"
       android:visibility="gone" />
 
   <TextView
