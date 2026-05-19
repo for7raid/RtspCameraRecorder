@@ -90,7 +90,7 @@ public class RingBufferStorage
             {
                 if (_videoBuffer.TryPeek(out var oldestVideoFrame))
                 {
-                    while (_audioBuffer.TryDequeue(out var oldestAudioFrame) && oldestAudioFrame.Timestamp < oldestVideoFrame.Timestamp)
+                    while (_audioBuffer.TryDequeue(out var oldestAudioFrame) && oldestAudioFrame.RtpTimestamp < oldestVideoFrame.RtpTimestamp)
                     {
                         //ничего не делаем, уже удалили
                     }

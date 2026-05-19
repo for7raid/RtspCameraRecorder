@@ -30,6 +30,7 @@ public class AndroidMuxedDumper : IFramesDumper
             var stop = lastFrame.Timestamp;
             var duration = (stop - start).TotalSeconds;
             string fileName = $"{start:yyyy-MM-dd HH.mm.ss} {duration:00}sec.mp4";
+            long basePts = (long)(firstFrame.Timestamp.Ticks / 10); // 1 tick = 0.1µs
 
             _logger.LogInformation(
                 "Запись завершена {Time:HH:mm:ss}, первый кадр: {FirstFrame:HH:mm:ss.f} ({UnitType}), длительность: {Duration}с, кадров: {Count}",
@@ -53,7 +54,7 @@ public class AndroidMuxedDumper : IFramesDumper
             int videoTrackIndex = muxer.AddTrack(videoFormat);
 
 
-            AddAudio(audioFrames, muxer);
+            AddAudio(audioFrames, muxer, basePts);
 
             //muxer.Start();
 
@@ -66,7 +67,7 @@ public class AndroidMuxedDumper : IFramesDumper
                 ByteBuffer buffer = ByteBuffer.Wrap(frame.Data);
                 MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 
-                long basePts = (long)(firstFrame.Timestamp.Ticks / 10); // 1 tick = 0.1µs
+              
                                                                         // Для каждого кадра:
                 bufferInfo.PresentationTimeUs = (long)(frame.Timestamp.Ticks / 10) - basePts;
 
@@ -109,133 +110,79 @@ public class AndroidMuxedDumper : IFramesDumper
         return csd0;
     }
 
-    public void AddAudio(List<AudioFrame> audioFrames, MediaMuxer muxer)
+    public void AddAudio(List<AudioFrame> audioFrames, MediaMuxer muxer, long videoBasePts)
     {
-        try
+        string mime = MediaFormat.MimetypeAudioAac; 
+        int sampleRate = 8000, channelCount = 1, bitRate = 32000;
+
+        MediaFormat format = MediaFormat.CreateAudioFormat(mime, sampleRate, channelCount);
+        format.SetInteger(MediaFormat.KeyBitRate, bitRate);
+        format.SetInteger(MediaFormat.KeyAacProfile, (int)MediaCodecProfileType.Aacobjectlc);
+
+        using MediaCodec encoder = MediaCodec.CreateEncoderByType(mime);
+        encoder.Configure(format, null, null, MediaCodecConfigFlags.Encode);
+        encoder.Start();
+
+        var bufferInfo = new MediaCodec.BufferInfo();
+        int audioTrackIndex = -1;
+        bool muxerStarted = false;
+
+        for (int i = 0; i <= audioFrames.Count; i++)
         {
+            bool isEnd = i == audioFrames.Count;
 
-            // 1. Настройка AAC-энкодера
-            string mime = "audio/mp4a-latm";
-            int sampleRate = 8000; // Частота дискретизации WAV-файла
-            int channelCount = 1;   // Количество каналов
-            int bitRate = 128000;   // Битрейт AAC
-
-            // Создаем и настраиваем формат для энкодера
-            MediaFormat format = MediaFormat.CreateAudioFormat(mime, sampleRate, channelCount);
-            format.SetInteger(MediaFormat.KeyBitRate, bitRate);
-            format.SetInteger(MediaFormat.KeyChannelCount, channelCount);
-            format.SetInteger(MediaFormat.KeyAacProfile, (int)MediaCodecProfileType.Aacobjectlc); // Профиль AAC-LC
-
-            //double durationInMs = (input.Length * 2 / 16000) * 1000;
-            //format.SetLong(MediaFormat.KeyDuration, (long)durationInMs);
-
-            // Создаем энкодер
-            using MediaCodec encoder = MediaCodec.CreateEncoderByType(mime);
-            encoder.Configure(format, null, null, MediaCodecConfigFlags.Encode);
-            encoder.Start();
-
-            // Получаем буферы энкодера
-            var bufferInfo = new MediaCodec.BufferInfo();
-
-            // 2. Чтение WAV и кодирование
-            using var wavStream = new MemoryStream();
-            using var aacStream = new MemoryStream();
-
-            foreach (AudioFrame frame in audioFrames)
+            // ── Подаём PCM на вход ──
+            int inputIndex = encoder.DequeueInputBuffer(10000);
+            if (inputIndex >= 0)
             {
-                wavStream.Write(NAudio.Codecs.MuLawDecoder.DecodeMuLawToPcm(frame.Data));
+                ByteBuffer inputBuf = encoder.GetInputBuffer(inputIndex)!;
+                inputBuf.Clear();
+
+                if (!isEnd)
+                {
+                    var af = audioFrames[i];
+                    byte[] pcm = NAudio.Codecs.MuLawDecoder.DecodeMuLawToPcm(af.Data);
+                    inputBuf.Put(pcm);
+                    long pts = (long)(af.Timestamp.Ticks / 10) - videoBasePts;
+                    encoder.QueueInputBuffer(inputIndex, 0, pcm.Length, pts, MediaCodecBufferFlags.None);
+                }
+                else
+                {
+                    encoder.QueueInputBuffer(inputIndex, 0, 0, 0, MediaCodecBufferFlags.EndOfStream);
+                }
             }
 
-            wavStream.Position = 0;
-
-            byte[] pcmBuffer = new byte[4096 * 2]; // Размер произвольный, но не слишком маленький
-            bool isEndOfStream = false;
-            int bytesRead;
-            int audioTrackIndex = 0;// muxer.AddTrack(format);
-            bool isStarted = false;
-
-            while (!isEndOfStream)
+            // ── Забираем AAC на выход ──
+            int outputIndex;
+            while ((outputIndex = encoder.DequeueOutputBuffer(bufferInfo, 0)) >= 0)
             {
-                int inputBufferIndex = encoder.DequeueInputBuffer(10000);
-
-
-                // --- Начало кодирования ---
-                // Запрашиваем свободный входной буфер
-
-                if (inputBufferIndex >= 0)
+                if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.CodecConfig))
                 {
-                    ByteBuffer inputBuffer = encoder.GetInputBuffer(inputBufferIndex);
-                    inputBuffer.Clear();
-
-                    bytesRead = wavStream.Read(pcmBuffer, 0, inputBuffer.Capacity());
-                    isEndOfStream = bytesRead <= 0;
-
-                    if (bytesRead > 0)
-                    {
-                        // Копируем PCM-данные во входной буфер
-                        inputBuffer.Put(pcmBuffer, 0, bytesRead);
-                    }
-
-                    encoder.QueueInputBuffer(inputBufferIndex, 0, bytesRead, 0,
-                        // Важно: сообщаем, что это конец потока
-                        flags: isEndOfStream ? MediaCodecBufferFlags.EndOfStream : MediaCodecBufferFlags.None);
-
+                    encoder.ReleaseOutputBuffer(outputIndex, false);
+                    continue;
                 }
 
-                // --- Получение готовых AAC-данных ---
-                int outputBufferIndex;
-                do
+                ByteBuffer outBuf = encoder.GetOutputBuffer(outputIndex)!;
+                outBuf.Position(bufferInfo.Offset);
+                outBuf.Limit(bufferInfo.Offset + bufferInfo.Size);
+
+                if (audioTrackIndex < 0)
                 {
-                    outputBufferIndex = encoder.DequeueOutputBuffer(bufferInfo, 10000);
+                    audioTrackIndex = muxer.AddTrack(encoder.OutputFormat);
+                    muxer.Start();
+                    muxerStarted = true;
+                }
 
-                    if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.CodecConfig))
-                    {
-                        encoder.ReleaseOutputBuffer(outputBufferIndex, false);
-                    }
-                    else if (outputBufferIndex >= 0)
-                    {
-                        ByteBuffer outputBuffer = encoder.GetOutputBuffer(outputBufferIndex);
-                        outputBuffer.Position(bufferInfo.Offset);
-                        outputBuffer.Limit(bufferInfo.Offset + bufferInfo.Size);
+                muxer.WriteSampleData(audioTrackIndex, outBuf, bufferInfo);
+                encoder.ReleaseOutputBuffer(outputIndex, false);
 
-                        muxer.WriteSampleData(audioTrackIndex, outputBuffer, bufferInfo);
-                        //aacStream.Write(aacChunk, 0, aacChunk.Length);
-
-
-                        // Обязательно освобождаем буфер
-                        encoder.ReleaseOutputBuffer(outputBufferIndex, false);
-
-                        if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.EndOfStream))
-                        {
-                            break; // Выходим, как только получен флаг конца потока
-                        }
-                    }
-                    else if (outputBufferIndex == (int)MediaCodecInfoState.OutputFormatChanged)
-                    {
-                        // КРИТИЧЕСКИЙ МОМЕНТ: Добавляем трек в Muxer только после смены формата
-
-                        MediaFormat newFormat = encoder.OutputFormat;
-                        audioTrackIndex = muxer.AddTrack(newFormat);
-                        if (!isStarted)
-                        {
-                            muxer.Start();
-                            isStarted = true;
-                        }
-                    }
-                } while (outputBufferIndex >= 0);
+                if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.EndOfStream))
+                    break;
             }
-
-
-            // 3. Завершение работы
-            encoder.Stop();
-            encoder.Release();
-
-
         }
-        catch (Exception ex)
-        {
 
-            throw;
-        }
+        encoder.Stop();
+        encoder.Release();
     }
+
 }
