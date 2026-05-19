@@ -1,6 +1,6 @@
 using Java.Lang;
 
-namespace CameraRecorderAndroidApp;
+namespace CameraRecorderAndroidApp.Activities;
 
 [Activity(Label = "Логи")]
 public class LogsActivity : Activity

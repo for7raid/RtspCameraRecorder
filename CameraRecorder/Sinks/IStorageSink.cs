@@ -13,5 +13,5 @@ public interface IStorageSink
     /// <param name="fileName">Имя файла (без пути)</param>
     /// <param name="data">Данные файла</param>
     /// <param name="ct">Токен отмены</param>
-    void SaveAsync(string fileName, byte[] data, CancellationToken ct);
+    void SaveAsync(string fileName, byte[] data);
 }

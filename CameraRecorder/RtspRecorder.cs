@@ -1,4 +1,4 @@
-﻿using CameraRecorder.MotionAnalyzers;
+﻿using CameraRecorder.RTSP;
 using CameraRecorder.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -9,7 +9,6 @@ namespace CameraRecorder;
 public class RtspRecorder
 {
     private readonly ILogger<RtspRecorder> _logger;
-    private readonly ILoggerFactory _loggerFactory;
     private readonly RTSPClient _client;
     private readonly IH26xDecoder _h26XDecoder;
     private readonly IOptions<CameraRecorderSettings> _options;
@@ -18,8 +17,7 @@ public class RtspRecorder
     private const string ProfileH264 = "H264";
     private const string ProfileH265 = "H265";
     private const string ProfilePCMU = "PCMU";
-    MotionAnalyzer _motionAnalyzer;
-    private DateTime? _lastMotionTime;
+
     private bool _isRecording;
 
     /// <summary>
@@ -49,22 +47,20 @@ public class RtspRecorder
     public bool IsRecording => _isRecording;
 
     public bool StreamingFinished { get { return _client.StreamingFinished; } }
-    public RtspRecorder(ILoggerFactory loggerFactory,
+    public RtspRecorder(ILogger<RtspRecorder> logger,
         RTSPClient client,
         RingBufferStorage bufferVideoStorage,
         IFramesDumper framesDumper,
         [FromKeyedServices("OnScreenDecoder")] IH26xDecoder? h26XDecoder,
         IOptions<CameraRecorderSettings> options)
     {
-        _loggerFactory = loggerFactory;
         _client = client;
         _h26XDecoder = h26XDecoder;
         _options = options;
         _bufferVideoStorage = bufferVideoStorage;
         _framesDumper = framesDumper;
-        _logger = _loggerFactory.CreateLogger<RtspRecorder>();
+        _logger = logger;
 
-        _motionAnalyzer = new(VideoCodec.H265, loggerFactory.CreateLogger<MotionAnalyzer>(), MotionSensitivity.SlowHand);
 
         client.SetupAudioPayload(ProfilePCMU, ReceiveAudioPCMx);
         client.SetupVideoPayload(ProfileH265, ReceivedVideoData_H265);
@@ -93,7 +89,7 @@ public class RtspRecorder
         }
     }
 
-    public async Task StopRecordAsync()
+    public void StopRecord()
     {
         if (_isRecording)
         {

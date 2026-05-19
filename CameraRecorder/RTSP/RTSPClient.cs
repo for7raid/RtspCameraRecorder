@@ -12,7 +12,7 @@ using System.Net;
 using System.Net.Security;
 using System.Text;
 
-namespace CameraRecorder;
+namespace CameraRecorder.RTSP;
 
 public class RTSPClient
 {

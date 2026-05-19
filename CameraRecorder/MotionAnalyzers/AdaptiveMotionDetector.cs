@@ -521,72 +521,77 @@ public class AdaptiveMotionDetector
         var startTime = DateTime.Now;
         var result = new MotionDetectionResult() { RtpTimestamp = RtpTimestamp };
 
-
-        if (rgbaData.Length != _settings.Width * _settings.Height * _bytesPerPixel)
+        try
         {
-            throw new ArgumentException(
-                $"Размер данных не соответствует изображению. " +
-                $"Ожидается: {_settings.Width * _settings.Height * _bytesPerPixel}, получено: {rgbaData.Length}");
-        }
+            if (rgbaData.Length != _settings.Width * _settings.Height * _bytesPerPixel)
+            {
+                throw new ArgumentException(
+                    $"Размер данных не соответствует изображению. " +
+                    $"Ожидается: {_settings.Width * _settings.Height * _bytesPerPixel}, получено: {rgbaData.Length}");
+            }
 
+            // Получаем карту яркости
+            var currentMap = GetBlockBrightnessMap(rgbaData);
 
-        // Получаем карту яркости
-        var currentMap = GetBlockBrightnessMap(rgbaData);
+            // Получаем эталонный фон
+            byte[] background = GetBackgroundMapEMA(currentMap);
+            // Добавляем в буфер
+            //_frameBuffer.Add(currentMap);
 
-        // Получаем эталонный фон
-        byte[] background = GetBackgroundMapEMA(currentMap);
-        // Добавляем в буфер
-        //_frameBuffer.Add(currentMap);
+            _framesProcessed++;
 
-        _framesProcessed++;
+            // Обновляем статистику освещения
+            UpdateLightingStatsPeriodic(currentMap);
 
-        // Обновляем статистику освещения
-        UpdateLightingStatsPeriodic(currentMap);
+            // Проверяем, достаточно ли кадров
+            if (_framesProcessed < _settings.MinFramesBeforeDetection)
+            {
+                result.HasMotion = false;
+                result.IsAdapting = true;
+                result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
+                result.CurrentThreshold = _currentLightingStats?.AdaptiveThreshold ?? 25.0;
+                return result;
+            }
 
-        // Проверяем, достаточно ли кадров
-        if (_framesProcessed < _settings.MinFramesBeforeDetection)
-        {
-            result.HasMotion = false;
-            result.IsAdapting = true;
+            if (background == null)
+            {
+                result.HasMotion = false;
+                result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
+                return result;
+            }
+
+            // Получаем актуальный порог
+            double threshold = _currentLightingStats?.AdaptiveThreshold ?? 25.0;
+
+            // Сравниваем с фоном
+            var changedMap = CompareBrightnessMaps(currentMap, background, threshold);
+
+            // Определяем наличие движения
+            bool rawMotion = changedMap.changedRatio >= _settings.ChangedBlocksRatioThreshold;
+            bool filteredMotion = FilterSpikes(rawMotion);
+
+            // Заполняем результат
+            result.HasMotion = filteredMotion;
+            result.ChangedBlocksCount = changedMap.changedCount;
+            result.ChangedBlocksPercent = changedMap.changedRatio;
+            result.TotalBlocksCount = _totalBlocks;
+            result.ChangedBlocksMap = changedMap.map;
+            result.AverageChangeIntensity = changedMap.avgChangeIntensity;
+            result.LightingStats = _currentLightingStats;
+            result.CurrentThreshold = threshold;
+            result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
             result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-            result.CurrentThreshold = _currentLightingStats?.AdaptiveThreshold ?? 25.0;
-            return result;
-        }
 
-        if (background == null)
+            if (filteredMotion)
+                _logger.LogInformation(result.ToString());
+            else
+                _logger.LogDebug(result.ToString());
+        }
+        catch (Exception ex)
         {
-            result.HasMotion = false;
-            result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-            return result;
+
+            _logger.LogError(ex, "Ошибка обнаружения движения.");
         }
-
-        // Получаем актуальный порог
-        double threshold = _currentLightingStats?.AdaptiveThreshold ?? 25.0;
-
-        // Сравниваем с фоном
-        var changedMap = CompareBrightnessMaps(currentMap, background, threshold);
-
-        // Определяем наличие движения
-        bool rawMotion = changedMap.changedRatio >= _settings.ChangedBlocksRatioThreshold;
-        bool filteredMotion = FilterSpikes(rawMotion);
-
-        // Заполняем результат
-        result.HasMotion = filteredMotion;
-        result.ChangedBlocksCount = changedMap.changedCount;
-        result.ChangedBlocksPercent = changedMap.changedRatio;
-        result.TotalBlocksCount = _totalBlocks;
-        result.ChangedBlocksMap = changedMap.map;
-        result.AverageChangeIntensity = changedMap.avgChangeIntensity;
-        result.LightingStats = _currentLightingStats;
-        result.CurrentThreshold = threshold;
-        result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
-        result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-
-        if (filteredMotion)
-            _logger.LogInformation(result.ToString());
-        else
-            _logger.LogDebug(result.ToString());
-
 
         return result;
     }

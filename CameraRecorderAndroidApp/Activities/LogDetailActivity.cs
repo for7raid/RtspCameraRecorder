@@ -2,7 +2,7 @@ using Android.App;
 using Android.OS;
 using Android.Widget;
 
-namespace CameraRecorderAndroidApp;
+namespace CameraRecorderAndroidApp.Activities;
 
 [Activity(Label = "Просмотр лога")]
 public class LogDetailActivity : Activity

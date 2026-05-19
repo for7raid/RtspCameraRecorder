@@ -1,7 +1,7 @@
 ﻿using Rtsp;
 using Rtsp.Messages;
 
-namespace CameraRecorder;
+namespace CameraRecorder.RTSP;
 
 public static class RTSPMessageAuthExtension
 {

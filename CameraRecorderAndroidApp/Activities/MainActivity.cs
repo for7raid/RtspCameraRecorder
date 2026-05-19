@@ -4,7 +4,7 @@ using CameraRecorderAndroidApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace CameraRecorderAndroidApp
+namespace CameraRecorderAndroidApp.Activities
 {
     [Activity(Label = "@string/app_name",
         MainLauncher = true,
@@ -34,14 +34,14 @@ namespace CameraRecorderAndroidApp
             _logger = serviceProvider.GetRequiredService<ILogger<MainActivity>>();
             _webServer = serviceProvider.GetRequiredService<LogWebServer>();
 
-            
+
 
             _rtspMotionDetector.DetectionLog += (log) =>
             {
                 RunOnUiThread(() => { txtMotionLog!.Text = log; });
             };
-            //_rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
-            //_rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecordAsync(); };
+            _rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
+            _rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecord(); };
 
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {
@@ -114,7 +114,7 @@ namespace CameraRecorderAndroidApp
             btnStart.Click += (_, _) => _rtspRecorder.StartRecord();
 
             btnStop = FindViewById<Button>(Resource.Id.btnStopRecord)!;
-            btnStop.Click += async (_, _) => await _rtspRecorder.StopRecordAsync();
+            btnStop.Click += (_, _) => _rtspRecorder.StopRecord();
 
 
         }

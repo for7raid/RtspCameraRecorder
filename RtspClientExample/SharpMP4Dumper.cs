@@ -6,6 +6,10 @@ using SharpISOBMFF;
 using SharpMP4.Builders;
 using SharpMP4.Common;
 using SharpMP4.Tracks;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
 
 namespace CameraRecorder
 {
@@ -64,7 +68,7 @@ namespace CameraRecorder
                 // Раздаём всем sink-ам (fire-and-forget, каждый получает byte[])
                 var fileData = mp4Stream.ToArray();
                 foreach (var sink in _sinks)
-                    sink.SaveAsync(fileName, fileData, CancellationToken.None);
+                    sink.SaveAsync(fileName, fileData);
 
             }
             catch (Exception ex)

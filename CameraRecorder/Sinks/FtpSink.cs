@@ -18,7 +18,7 @@ public sealed class FtpSink : IStorageSink
         _logger = logger;
     }
 
-    public async void SaveAsync(string fileName, byte[] data, CancellationToken ct)
+    public async void SaveAsync(string fileName, byte[] data)
     {
         var settings = _options.Value;
         if (!settings.FtpEnabled)
@@ -50,12 +50,10 @@ public sealed class FtpSink : IStorageSink
             request.Timeout = 30_000;
             request.ReadWriteTimeout = 30_000;
 
-            // Отмена через токен
-            using var ctr = ct.Register(() => request.Abort());
 
             using var stream = new MemoryStream(data);
             using var requestStream = await request.GetRequestStreamAsync();
-            await stream.CopyToAsync(requestStream, ct);
+            await stream.CopyToAsync(requestStream);
 
             using var response = (FtpWebResponse)await request.GetResponseAsync();
             _logger.LogInformation("Файл загружен на FTP: {Uri} — {Status}", uri, response.StatusDescription);

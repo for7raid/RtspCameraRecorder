@@ -18,7 +18,7 @@ public sealed class LocalFileSink : IStorageSink
         _logger = logger;
     }
 
-    public async void SaveAsync(string fileName, byte[] data, CancellationToken ct)
+    public async void SaveAsync(string fileName, byte[] data)
     {
         var _settings = _options.Value;
         if (!_settings.LocalStorageEnabled)
@@ -67,7 +67,7 @@ public sealed class LocalFileSink : IStorageSink
                 string path = Path.Combine(_settings.LocalRecordingsPath, fileName);
                 using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None,
                    bufferSize: 81920, useAsync: true);
-                await stream.CopyToAsync(fs, ct);
+                await stream.CopyToAsync(fs);
                 _logger.LogInformation("Файл сохранён локально: {Path}", path);
             }
 

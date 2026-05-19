@@ -1,5 +1,5 @@
 ﻿using CameraRecorder;
-using CameraRecorder.MotionAnalyzers;
+using CameraRecorder.RTSP;
 using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
 using Microsoft.Extensions.Configuration;
@@ -22,7 +22,6 @@ namespace RtspClientExample
 
 
             services.AddTransient<RingBufferStorage>();
-            services.AddTransient<RingBufferAudioStorage>();
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
             services.AddTransient<RtspMotionDetector>();
@@ -68,7 +67,7 @@ namespace RtspClientExample
             logger = serviceProvider.GetRequiredService<ILogger<Recorder>>();
 
             rtspMotionDetector.MotionDetected += () => recorder.StartRecord();
-            rtspMotionDetector.MotionEnded += () => recorder.StopRecordAsync();
+            rtspMotionDetector.MotionEnded += () => recorder.StopRecord();
 
             recorder.Start();
             rtspMotionDetector.Start();
@@ -97,7 +96,7 @@ namespace RtspClientExample
                 {
                     stopwatch.Stop();
                     logger.LogInformation($"Stop recording {stopwatch.Elapsed}");
-                    recorder.StopRecordAsync();
+                    recorder.StopRecord();
                 }
             }
 

@@ -155,6 +155,8 @@ public class H265Decoder : IH26xDecoder, IDisposable
     /// </summary>
     public void DecodeFrame(byte[] h265Data, long timestampUs = 0, NalUnitType nalUnitType = NalUnitType.Unknown)
     {
+        try
+        {
         if (!_isRunning || h265Data == null || h265Data.Length == 0)
             return;
 
@@ -189,13 +191,12 @@ public class H265Decoder : IH26xDecoder, IDisposable
         {
             return;
         }
+        else if (!_csdSent)
+        {
+            return;
+        }
         else
         {
-            if (!_csdSent)
-            {
-                return;
-            }
-
             _inputQueue.Enqueue(new H26xFrameData
             {
                 Data = h265Data,
@@ -206,6 +207,14 @@ public class H265Decoder : IH26xDecoder, IDisposable
             });
         }
         _inputSignal.Set();
+
+        }
+        catch (Exception ex)
+        {
+
+            _logger.LogError(ex, "Ошибка декодирования видео фрейма.");
+        }
+
     }
 
     /// <summary>

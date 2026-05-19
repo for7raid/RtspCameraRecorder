@@ -20,8 +20,6 @@ public class AndroidMuxedDumper : IFramesDumper
     {
         try
         {
-            long id = 0;
-
             var firstFrame = videoFrames[0];
             var lastFrame = videoFrames[^1];
             var start = firstFrame.Timestamp;
@@ -83,7 +81,7 @@ public class AndroidMuxedDumper : IFramesDumper
             var fileData = File.ReadAllBytes(tmpFile);
             // Раздаём всем sink-ам (fire-and-forget, каждый получает byte[])
             foreach (var sink in _sinks)
-                sink.SaveAsync(fileName, fileData, CancellationToken.None);
+                sink.SaveAsync(fileName, fileData);
 
         }
         catch (Exception ex)
