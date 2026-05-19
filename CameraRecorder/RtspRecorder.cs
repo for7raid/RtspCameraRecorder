@@ -139,7 +139,7 @@ public class RtspRecorder
                 var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
                 var unit = nalUnitMem.Slice(4);
                 _bufferVideoStorage.AddVideoFrame(nalUnit.ToArray(), nal_unit_type, dataArgs.RtpTimestamp);
-                _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
+                _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), 0L, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
 
                 if (_isRecording)

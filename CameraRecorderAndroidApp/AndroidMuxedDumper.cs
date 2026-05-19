@@ -1,10 +1,8 @@
 ﻿using Android.Media;
 using CameraRecorder;
 using CameraRecorder.Sinks;
-using CameraRecorderAndroidApp.Sinks;
 using Java.Nio;
 using Microsoft.Extensions.Logging;
-using static Android.Renderscripts.ScriptGroup;
 
 namespace CameraRecorderAndroidApp;
 
