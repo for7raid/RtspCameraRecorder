@@ -47,7 +47,7 @@ public class RtspMotionDetector
             FrameBufferSize = 30,
 
             // Ключевые параметры
-            ChangedBlocksRatioThreshold = 0.01,  // 1.5% (около 130 блоков)
+            ChangedBlocksRatioThreshold = 0.008,  // 0.8%
             SigmaThreshold = 2.5,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
 
             MinFramesBeforeDetection = 10,

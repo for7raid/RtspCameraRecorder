@@ -16,7 +16,7 @@ namespace CameraRecorderAndroidApp.Activities
         private RtspMotionDetector _rtspMotionDetector;
         private H265Decoder _decoderDetector;
         private readonly H265Decoder _decoderScreen;
-        private TextView? txtRecordingStatus;
+        private TextView? txtRecordingStatus, txtLastRecording;
         private TextView? txtMotionLog;
         private Button? btnStart, btnStop;
         public TextView? txtView3 { get; private set; }
@@ -57,6 +57,8 @@ namespace CameraRecorderAndroidApp.Activities
                 {
                     if (btnStart != null) btnStart.Visibility = ViewStates.Gone;
                     if (btnStop != null) btnStop.Visibility = ViewStates.Visible;
+                    txtLastRecording.Visibility = ViewStates.Gone;
+                    txtRecordingStatus.Visibility = ViewStates.Visible;
                 });
             };
 
@@ -66,6 +68,10 @@ namespace CameraRecorderAndroidApp.Activities
                 {
                     if (btnStart != null) btnStart.Visibility = ViewStates.Visible;
                     if (btnStop != null) btnStop.Visibility = ViewStates.Gone;
+
+                    txtLastRecording.Visibility = ViewStates.Visible;
+                    txtRecordingStatus.Visibility = ViewStates.Gone;
+                    txtLastRecording.Text = "🏃‍ "+ DateTime.Now.ToString("HH:mm");
                 });
             };
         }
@@ -76,6 +82,7 @@ namespace CameraRecorderAndroidApp.Activities
             SetContentView(Resource.Layout.activity_main);
 
             txtRecordingStatus = FindViewById<TextView>(Resource.Id.txtRecordingStatus);
+            txtLastRecording = FindViewById<TextView>(Resource.Id.txtLastRecording);
             txtMotionLog = FindViewById<TextView>(Resource.Id.txtMotionLog);
 
 

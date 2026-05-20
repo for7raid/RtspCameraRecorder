@@ -5,14 +5,14 @@ using Microsoft.Extensions.Options;
 
 namespace CameraRecorderAndroidApp.Sinks;
 
-public sealed class LocalFileSink : IStorageSink
+public sealed class AndroidLocalFileSink : IStorageSink
 {
     private readonly IOptions<CameraRecorderSettings> _options;
-    private readonly ILogger<LocalFileSink> _logger;
+    private readonly ILogger<AndroidLocalFileSink> _logger;
 
     public string Name => "LocalFile";
 
-    public LocalFileSink(IOptions<CameraRecorderSettings> options, ILogger<LocalFileSink> logger)
+    public AndroidLocalFileSink(IOptions<CameraRecorderSettings> options, ILogger<AndroidLocalFileSink> logger)
     {
         _options = options;
         _logger = logger;
@@ -53,9 +53,8 @@ public sealed class LocalFileSink : IStorageSink
                 Android.Content.ContentValues contentValues = new();
                 contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
                 contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, mimeType);
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Download");
+                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, _settings.LocalRecordingsPath);
                 //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.Data, Path.Combine(_settings.LocalRecordingsPath, fileName));
-                var uri = Path.GetExtension(fileName) == ".mp4" ? Android.Provider.MediaStore.Video.Media.ExternalContentUri : Android.Provider.MediaStore.Audio.Media.ExternalContentUri;
                 var imageUri = resolver.Insert(Android.Provider.MediaStore.Downloads.ExternalContentUri, contentValues);
 
                 using var os = resolver.OpenOutputStream(imageUri);
@@ -76,6 +75,33 @@ public sealed class LocalFileSink : IStorageSink
         catch (Exception ex)
         {
             _logger.LogError(ex, "LocalFileSink: ошибка сохранения {FileName}", fileName);
+        }
+    }
+
+    public async void SaveAsync(string fileName, string tmpDataFilePath)
+    {
+        var _settings = _options.Value;
+        if (!_settings.LocalStorageEnabled)
+        {
+            _logger.LogDebug("LocalFileSink: локальное хранилище отключено, пропускаю");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_settings.LocalRecordingsPath))
+        {
+            _logger.LogDebug("LocalFileSink: путь не задан, пропускаю");
+            return;
+        }
+
+        try
+        {
+            string path = Path.Combine(_settings.LocalRecordingsPath, fileName);
+            File.Move(tmpDataFilePath, path);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Операции над файлами недоступы");
+            SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
         }
     }
 }

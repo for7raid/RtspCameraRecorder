@@ -1,7 +1,9 @@
-﻿using CameraRecorder;
+﻿using Android.Runtime;
+using CameraRecorder;
 using CameraRecorder.RTSP;
 using CameraRecorder.Settings;
 using CameraRecorder.Sinks;
+using CameraRecorderAndroidApp.Activities;
 using CameraRecorderAndroidApp.Sinks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,16 +23,16 @@ namespace CameraRecorderAndroidApp.Services
 
             var services = new ServiceCollection();
 
-            services.AddTransient<LocalFileSink>();
+            services.AddTransient<AndroidLocalFileSink>();
             services.AddTransient<RingBufferStorage>();
-    
+
             services.AddTransient<RTSPClient>();
             services.AddTransient<RtspRecorder>();
             services.AddTransient<RtspMotionDetector>();
 
             services.AddTransient<IFramesDumper, AndroidMuxedDumper>();
 
-            services.AddTransient<IStorageSink, LocalFileSink>();
+            services.AddTransient<IStorageSink, AndroidLocalFileSink>();
             //services.AddTransient<IStorageSink, FtpSink>();
 
             services.AddKeyedSingleton<IH26xDecoder>("OnScreenDecoder", (sp, _) => { return new H265Decoder(2650, 1440, sp.GetRequiredService<ILogger<H265Decoder>>()); });
@@ -79,6 +81,34 @@ namespace CameraRecorderAndroidApp.Services
 
             // Строим провайдер
             Instance = services.BuildServiceProvider();
+
+            var logger = Instance.GetRequiredService<ILogger<MainActivity>>();
+
+            // 1. Для исключений в .NET потоках (менее критично, но добавить стоит)
+            AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+            {
+                logger.LogCritical(args.ExceptionObject as Exception, "Критическая ошибка.");
+                // Не пытаемся здесь "спасти" приложение
+            };
+
+            // 2. Для исключений в Task (например, забыли await)
+            TaskScheduler.UnobservedTaskException += (sender, args) =>
+            {
+                logger.LogCritical(args.Exception, "Критическая ошибка.");
+                args.SetObserved(); // Подавляем стандартное поведение (краш)
+            };
+
+            // 3. ГЛАВНОЕ: для исключений в Java/UI потоке
+            AndroidEnvironment.UnhandledExceptionRaiser += (sender, args) =>
+            {
+                // Логируем ошибку
+                logger.LogCritical(args.Exception, "Критическая ошибка.");
+
+
+                // ОСТОРОЖНО: Говорим системе, что мы сами обработали ошибку
+                // Это может предотвратить закрытие приложения, но может привести к багам.
+                args.Handled = true;
+            };
         }
 
         public static ServiceProvider Instance { get; private set; }

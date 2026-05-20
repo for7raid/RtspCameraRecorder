@@ -81,4 +81,9 @@ public sealed class FtpSink : IStorageSink
         var path = settings.FtpDirectory + (fileName.StartsWith('/') ? fileName : "/" + fileName);
         return new Uri($"{scheme}://{host}{path}");
     }
+
+    public async void SaveAsync(string fileName, string tmpDataFilePath)
+    {
+        SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
+    }
 }

@@ -44,4 +44,9 @@ public sealed class LocalFileSink_ : IStorageSink
         _logger.LogInformation("Файл сохранён локально: {Path}", fullPath);
 
     }
+
+    public async void SaveAsync(string fileName, string tmpDataFilePath)
+    {
+        SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
+    }
 }
