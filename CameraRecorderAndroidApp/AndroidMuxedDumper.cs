@@ -37,22 +37,15 @@ public class AndroidMuxedDumper : IFramesDumper
                 var tmpFile = Path.GetTempFileName();
                 using MediaMuxer muxer = new MediaMuxer(tmpFile, MuxerOutputType.Mpeg4);
 
-
-                byte[] sps = videoFrames.FirstOrDefault(f => f.UnitType == NalUnitType.H265_SPS)?.Data,
-                        pps = videoFrames.FirstOrDefault(f => f.UnitType == NalUnitType.H265_PPS)?.Data,
-                        vps = videoFrames.FirstOrDefault(f => f.UnitType == NalUnitType.H265_VPS)?.Data;
-                if (sps == null || pps == null || vps == null)
-                {
-                    _logger.LogError("Не найдены SPS/PPS в видеокадрах");
-                    return;
-                }
-
-                MediaFormat videoFormat = MediaFormat.CreateVideoFormat(MediaFormat.MimetypeVideoHevc, 2650, 1440);
-                videoFormat.SetByteBuffer("csd-0", ByteBuffer.Wrap(ConcatenateVpsSpsPps(vps, sps, pps)));
+                MediaFormat videoFormat = GetVideoFormat(videoFrames);
                 int videoTrackIndex = muxer.AddTrack(videoFormat);
 
+                MediaFormat format = GetAudioFormat();
+                int audioTrackIndex = muxer.AddTrack(format);
 
-                AddAudio(audioFrames, muxer, startTimestamp);
+                muxer.Start();
+
+                AddAudio(audioFrames, muxer, audioTrackIndex, startTimestamp);
                 AddVideo(videoFrames, muxer, videoTrackIndex, startTimestamp);
 
                 muxer.Stop();
@@ -73,6 +66,22 @@ public class AndroidMuxedDumper : IFramesDumper
                 _logger.LogError(ex, $"Ошибка сохранения файлов. video {firstVideoFrame?.Timestamp:mm:ss.ffff}, audio {firstAudioFrame?.Timestamp:mm:ss.ffff}");
             }
         });
+    }
+
+    private MediaFormat GetVideoFormat(List<VideoFrame> videoFrames)
+    {
+        byte[] sps = videoFrames.FirstOrDefault(f => f.UnitType == NalUnitType.H265_SPS)?.Data,
+                pps = videoFrames.FirstOrDefault(f => f.UnitType == NalUnitType.H265_PPS)?.Data,
+                vps = videoFrames.FirstOrDefault(f => f.UnitType == NalUnitType.H265_VPS)?.Data;
+
+        if (sps == null || pps == null || vps == null)
+        {
+            throw new Exception("Не найдены SPS/PPS в видеокадрах");
+        }
+
+        var videoFormat = MediaFormat.CreateVideoFormat(MediaFormat.MimetypeVideoHevc, 2650, 1440);
+        videoFormat.SetByteBuffer("csd-0", ByteBuffer.Wrap(ConcatenateVpsSpsPps(vps, sps, pps)));
+        return videoFormat;
     }
 
     private static void AddVideo(List<VideoFrame> videoFrames, MediaMuxer muxer, int videoTrackIndex, DateTime videoBasePts)
@@ -112,79 +121,115 @@ public class AndroidMuxedDumper : IFramesDumper
         return csd0;
     }
 
-    private void AddAudio(List<AudioFrame> audioFrames, MediaMuxer muxer, DateTime videoBasePts)
+    private void AddAudio(List<AudioFrame> audioFrames, MediaMuxer muxer, int audioTrackIndex, DateTime videoBasePts)
     {
-        string mime = MediaFormat.MimetypeAudioAac;
+        try
+        {
+            string mime = MediaFormat.MimetypeAudioAac;
+            MediaFormat format = GetAudioFormat(mime);
+
+            using MediaCodec encoder = MediaCodec.CreateEncoderByType(mime);
+            encoder.Configure(format, null, null, MediaCodecConfigFlags.Encode);
+            encoder.Start();
+
+            var bufferInfo = new MediaCodec.BufferInfo();
+
+            for (int i = 0; i <= audioFrames.Count; i++)
+            {
+                bool isEnd = i == audioFrames.Count;
+
+                // ── Подаём PCM на вход ──
+                int inputIndex = encoder.DequeueInputBuffer(10000);
+                if (inputIndex >= 0)
+                {
+                    ByteBuffer inputBuf = encoder.GetInputBuffer(inputIndex)!;
+                    inputBuf.Clear();
+
+                    if (!isEnd)
+                    {
+                        var af = audioFrames[i];
+                        byte[] pcm = NAudio.Codecs.MuLawDecoder.DecodeMuLawToPcm(af.Data);
+                        inputBuf.Put(pcm);
+                        long pts = (long)(af.Timestamp - videoBasePts).TotalMicroseconds;
+                        encoder.QueueInputBuffer(inputIndex, 0, pcm.Length, pts, MediaCodecBufferFlags.None);
+                    }
+                    else
+                    {
+                        encoder.QueueInputBuffer(inputIndex, 0, 0, 0, MediaCodecBufferFlags.EndOfStream);
+                    }
+                }
+
+                // ── Забираем AAC на выход ──
+                int outputIndex;
+                while ((outputIndex = encoder.DequeueOutputBuffer(bufferInfo, 10000)) >= 0)
+                {
+                    if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.CodecConfig))
+                    {
+                        encoder.ReleaseOutputBuffer(outputIndex, false);
+                        continue;
+                    }
+
+                    ByteBuffer outBuf = encoder.GetOutputBuffer(outputIndex)!;
+                    outBuf.Position(bufferInfo.Offset);
+                    outBuf.Limit(bufferInfo.Offset + bufferInfo.Size);
+
+                    muxer.WriteSampleData(audioTrackIndex, outBuf, bufferInfo);
+                    encoder.ReleaseOutputBuffer(outputIndex, false);
+
+                    if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.EndOfStream))
+                        break;
+                }
+            }
+
+            encoder.Stop();
+            encoder.Release();
+
+        }
+        catch (Exception ex)
+        {
+
+            _logger.LogError(ex, $"Ошибка обработки аудио");
+        }
+
+    }
+
+    private MediaFormat GetAudioFormat(string mime = MediaFormat.MimetypeAudioAac)
+    {
         int sampleRate = 8000, channelCount = 1, bitRate = 32000;
 
         MediaFormat format = MediaFormat.CreateAudioFormat(mime, sampleRate, channelCount);
         format.SetInteger(MediaFormat.KeyBitRate, bitRate);
+        format.SetInteger(MediaFormat.KeyChannelCount, channelCount);
         format.SetInteger(MediaFormat.KeyAacProfile, (int)MediaCodecProfileType.Aacobjectlc);
-
-        using MediaCodec encoder = MediaCodec.CreateEncoderByType(mime);
-        encoder.Configure(format, null, null, MediaCodecConfigFlags.Encode);
-        encoder.Start();
-
-        var bufferInfo = new MediaCodec.BufferInfo();
-        int audioTrackIndex = -1;
-        bool muxerStarted = false;
-
-        for (int i = 0; i <= audioFrames.Count; i++)
-        {
-            bool isEnd = i == audioFrames.Count;
-
-            // ── Подаём PCM на вход ──
-            int inputIndex = encoder.DequeueInputBuffer(10000);
-            if (inputIndex >= 0)
-            {
-                ByteBuffer inputBuf = encoder.GetInputBuffer(inputIndex)!;
-                inputBuf.Clear();
-
-                if (!isEnd)
-                {
-                    var af = audioFrames[i];
-                    byte[] pcm = NAudio.Codecs.MuLawDecoder.DecodeMuLawToPcm(af.Data);
-                    inputBuf.Put(pcm);
-                    long pts = (long)(af.Timestamp - videoBasePts).TotalMicroseconds;
-                    encoder.QueueInputBuffer(inputIndex, 0, pcm.Length, pts, MediaCodecBufferFlags.None);
-                }
-                else
-                {
-                    encoder.QueueInputBuffer(inputIndex, 0, 0, 0, MediaCodecBufferFlags.EndOfStream);
-                }
-            }
-
-            // ── Забираем AAC на выход ──
-            int outputIndex;
-            while ((outputIndex = encoder.DequeueOutputBuffer(bufferInfo, 10000)) >= 0)
-            {
-                if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.CodecConfig))
-                {
-                    encoder.ReleaseOutputBuffer(outputIndex, false);
-                    continue;
-                }
-
-                ByteBuffer outBuf = encoder.GetOutputBuffer(outputIndex)!;
-                outBuf.Position(bufferInfo.Offset);
-                outBuf.Limit(bufferInfo.Offset + bufferInfo.Size);
-
-                if (audioTrackIndex < 0)
-                {
-                    audioTrackIndex = muxer.AddTrack(encoder.OutputFormat);
-                    muxer.Start();
-                    muxerStarted = true;
-                }
-
-                muxer.WriteSampleData(audioTrackIndex, outBuf, bufferInfo);
-                encoder.ReleaseOutputBuffer(outputIndex, false);
-
-                if (bufferInfo.Flags.HasFlag(MediaCodecBufferFlags.EndOfStream))
-                    break;
-            }
-        }
-
-        encoder.Stop();
-        encoder.Release();
+        var sampleIndex = GetADTSFrequencyIndex(sampleRate);
+        var audioProfile = (int)MediaCodecProfileType.Aacobjectlc;
+        var csd = ByteBuffer.Allocate(2);
+        csd.Put((sbyte)((audioProfile << 3) | (sampleIndex >> 1)));
+        csd.Position(1);
+        csd.Put((sbyte)((sampleIndex << 7 & 0x80) | (channelCount << 3)));
+        csd.Flip();
+        format.SetByteBuffer("csd-0", csd);
+        return format;
     }
 
+    private int GetADTSFrequencyIndex(int sampleRate)
+    {
+        return sampleRate switch
+        {
+            96000 => 0,
+            88200 => 1,
+            64000 => 2,
+            48000 => 3,
+            44100 => 4,
+            32000 => 5,
+            24000 => 6,
+            22050 => 7,
+            16000 => 8,
+            12000 => 9,
+            11025 => 10,
+            8000 => 11,
+            7350 => 12,
+            _ => 4, // По умолчанию 44100
+        };
+    }
 }

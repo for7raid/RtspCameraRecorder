@@ -45,8 +45,8 @@ namespace CameraRecorderAndroidApp.Services
                 builder
                     .AddFilter("Microsoft", LogLevel.Warning)
                     .AddFilter("System", LogLevel.Warning)
-                    .AddFilter("RtspClientExample", LogLevel.Debug)
                     .AddFilter("Rtsp", LogLevel.Debug)
+                    .AddFilter("CameraRecorderAndroidApp", LogLevel.Information)
                     //.AddFilter("CameraRecorder.MotionAnalyzers.MotionDetectionResult", LogLevel.Debug)
                     .AddDebug()
                     //.AddFile(Path.Combine(Application.Context.FilesDir!.AbsolutePath, $@"\logs\log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"), fileSizeLimitBytes: 1_048_576 /*1Mb*/)

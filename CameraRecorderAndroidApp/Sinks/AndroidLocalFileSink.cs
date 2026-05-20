@@ -89,7 +89,7 @@ public sealed class AndroidLocalFileSink : IStorageSink
 
         if (string.IsNullOrWhiteSpace(_settings.LocalRecordingsPath))
         {
-            _logger.LogDebug("LocalFileSink: путь не задан, пропускаю");
+            _logger.LogDebug("LocalFileSink: путь не задан, пропускаю.");
             return;
         }
 
@@ -97,10 +97,11 @@ public sealed class AndroidLocalFileSink : IStorageSink
         {
             string path = Path.Combine(_settings.LocalRecordingsPath, fileName);
             File.Move(tmpDataFilePath, path);
+            _logger.LogInformation("Файл сохранён локально: {Path}.", path);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Операции над файлами недоступы");
+            _logger.LogWarning(ex, "Операции над файлами недоступы.");
             SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
         }
     }
