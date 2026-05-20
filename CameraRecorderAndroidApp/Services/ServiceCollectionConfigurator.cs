@@ -33,7 +33,7 @@ namespace CameraRecorderAndroidApp.Services
             services.AddTransient<IFramesDumper, AndroidMuxedDumper>();
 
             services.AddTransient<IStorageSink, AndroidLocalFileSink>();
-            //services.AddTransient<IStorageSink, FtpSink>();
+            services.AddTransient<IStorageSink, FtpSink>();
 
             services.AddKeyedSingleton<IH26xDecoder>("OnScreenDecoder", (sp, _) => { return new H265Decoder(2650, 1440, sp.GetRequiredService<ILogger<H265Decoder>>()); });
             services.AddKeyedSingleton<IH26xDecoder>("OnBufferDecoder", (sp, _) => { return new H265Decoder(640, 480, sp.GetRequiredService<ILogger<H265Decoder>>()); });

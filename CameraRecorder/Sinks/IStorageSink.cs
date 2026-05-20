@@ -12,12 +12,12 @@ public interface IStorageSink
     /// </summary>
     /// <param name="fileName">Имя файла (без пути)</param>
     /// <param name="data">Данные файла</param>
-    void SaveAsync(string fileName, byte[] data);
+    Task SaveAsync(string fileName, byte[] data);
 
     /// <summary>
     /// Сохранить файл.
     /// </summary>
     /// <param name="fileName">Имя файла (без пути)</param>
     /// <param name="tmpDataFilePath">Временный файл с содержимым</param>
-    void SaveAsync(string fileName, string tmpDataFilePath);
+    Task<(string newFilePath, bool isMoved)> SaveAsync(string fileName, string tmpDataFilePath);
 }

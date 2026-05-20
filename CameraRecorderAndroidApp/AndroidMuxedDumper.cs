@@ -18,7 +18,7 @@ public class AndroidMuxedDumper : IFramesDumper
     }
     public void ProcessFrames(List<VideoFrame> videoFrames, List<AudioFrame> audioFrames)
     {
-        Task.Run(() =>
+        Task.Run(async () =>
         {
             try
             {
@@ -51,11 +51,16 @@ public class AndroidMuxedDumper : IFramesDumper
                 muxer.Stop();
                 muxer.Release();
 
+                var isFileMoved = false;
                 // Раздаём всем sink-ам (fire-and-forget, каждый получает byte[])
                 foreach (var sink in _sinks)
-                    sink.SaveAsync(fileName, tmpFile);
+                {
+                    var saveResult = await sink.SaveAsync(fileName, tmpFile);
+                    tmpFile = saveResult.newFilePath;
+                    isFileMoved |= saveResult.isMoved;
+                }
 
-                if (File.Exists(tmpFile))
+                if (!isFileMoved && File.Exists(tmpFile))
                     File.Delete(tmpFile);
 
             }

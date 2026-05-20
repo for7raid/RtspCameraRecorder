@@ -18,7 +18,7 @@ public sealed class FtpSink : IStorageSink
         _logger = logger;
     }
 
-    public async void SaveAsync(string fileName, byte[] data)
+    public async Task SaveAsync(string fileName, byte[] data)
     {
         var settings = _options.Value;
         if (!settings.FtpEnabled)
@@ -82,8 +82,9 @@ public sealed class FtpSink : IStorageSink
         return new Uri($"{scheme}://{host}{path}");
     }
 
-    public async void SaveAsync(string fileName, string tmpDataFilePath)
+    public async Task<(string newFilePath, bool isMoved)> SaveAsync(string fileName, string tmpDataFilePath)
     {
-        SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
+        await SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
+        return (tmpDataFilePath, false);
     }
 }

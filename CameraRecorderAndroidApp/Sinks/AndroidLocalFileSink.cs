@@ -18,7 +18,7 @@ public sealed class AndroidLocalFileSink : IStorageSink
         _logger = logger;
     }
 
-    public async void SaveAsync(string fileName, byte[] data)
+    public async Task SaveAsync(string fileName, byte[] data)
     {
         var _settings = _options.Value;
         if (!_settings.LocalStorageEnabled)
@@ -55,7 +55,7 @@ public sealed class AndroidLocalFileSink : IStorageSink
                 contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, mimeType);
                 contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, _settings.LocalRecordingsPath);
                 //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.Data, Path.Combine(_settings.LocalRecordingsPath, fileName));
-                var imageUri = resolver.Insert(Android.Provider.MediaStore.Downloads.ExternalContentUri, contentValues);
+                var imageUri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, contentValues);
 
                 using var os = resolver.OpenOutputStream(imageUri);
                 await stream.CopyToAsync(os!);
@@ -78,31 +78,41 @@ public sealed class AndroidLocalFileSink : IStorageSink
         }
     }
 
-    public async void SaveAsync(string fileName, string tmpDataFilePath)
+    public async Task<(string newFilePath, bool isMoved)> SaveAsync(string fileName, string tmpDataFilePath)
     {
         var _settings = _options.Value;
         if (!_settings.LocalStorageEnabled)
         {
             _logger.LogDebug("LocalFileSink: локальное хранилище отключено, пропускаю");
-            return;
+            return (tmpDataFilePath, false);
         }
 
         if (string.IsNullOrWhiteSpace(_settings.LocalRecordingsPath))
         {
             _logger.LogDebug("LocalFileSink: путь не задан, пропускаю.");
-            return;
+            return (tmpDataFilePath, false);
         }
 
         try
         {
             string path = Path.Combine(_settings.LocalRecordingsPath, fileName);
+
+            if (OperatingSystem.IsAndroidVersionAtLeast(29))
+            {
+                path = Path.Combine(Android.OS.Environment.ExternalStorageDirectory.AbsolutePath, _settings.LocalRecordingsPath, fileName);
+            }
+
             File.Move(tmpDataFilePath, path);
             _logger.LogInformation("Файл сохранён локально: {Path}.", path);
+            tmpDataFilePath = path;
+            return (path, true);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Операции над файлами недоступы.");
-            SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
+            await SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
+            return (tmpDataFilePath, false);
+
         }
     }
 }
