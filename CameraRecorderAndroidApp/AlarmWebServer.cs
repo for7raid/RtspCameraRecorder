@@ -1,62 +1,29 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
 namespace CameraRecorder;
-public class webserver
+public class AlarmWebServer
 {
-    TcpListener? listener;
-
+    private readonly  TcpListener? _listener;
     CancellationToken _cancellationToken;
+    private readonly ILogger<AlarmWebServer> _logger;
 
-    public static void Main()
+    public AlarmWebServer(ILogger<AlarmWebServer> logger)
     {
-        Console.WriteLine("Hello, World!");
-
-        //Rec();
-        string hostName = Dns.GetHostName(); // Get the name of the host
-        IPAddress[] addresses = Dns.GetHostAddresses(hostName); // Get all IP addresses for this host
-
-        // Filter to find the first IPv4 address that isn't a loopback (127.0.0.1)
-        var localIPv4 = addresses.Where(ip =>
-            ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip));
-
-        Console.WriteLine("Local IP Address: " + string.Join(", ", localIPv4));
-
-        //var instance = new CameraRecorder();
-        //instance.StartTCP();
-
-        //Console.WriteLine("Press Enter to Exit...");
-        //Console.ReadLine();
-        //instance.StopRecording();
-
-        //var recoder = new RtspRecorder();
-        //var tokenSource = new CancellationTokenSource();
-        //var token = tokenSource.Token;
-        //var outputPath = Path.Combine("c:\\temp", $"record-{DateTime.Now:yyyyMMdd HH-mm-ss}.mkv");
-
-        //recoder.Record("rtsp://192.168.1.8:554/stream1", outputPath, token);
-
-        Console.WriteLine("Started");
-
-        Console.ReadLine();
-        //tokenSource.Cancel();
-
-
-
-    }
-
-
-    void StartTCP(int port = 6001)
-    {
-        listener = new TcpListener(IPAddress.Any, port);
-        listener.Start();
-        Console.WriteLine("Server started, waiting for connections...");
+    
+        _logger = logger;
+        
+        _listener = new TcpListener(IPAddress.Any, 8081);
+        _listener.Start();
 
         Thread acceptThread = new Thread(AcceptClients);
         acceptThread.Start();
+
+        _logger.LogInformation("Started alarm web server.");
     }
 
     async void AcceptClients()
@@ -65,7 +32,7 @@ public class webserver
         {
             try
             {
-                TcpClient client = await listener.AcceptTcpClientAsync(_cancellationToken);
+                TcpClient client = await _listener.AcceptTcpClientAsync(_cancellationToken);
 
                 Thread clientThread = new Thread(() => HandleClient(client));
                 clientThread.Start();
@@ -88,20 +55,19 @@ public class webserver
             while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
             {
                 string jsonString = Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("\0", "");
-                Console.WriteLine(jsonString);
+                _logger.LogInformation(jsonString);
+
                 var payload = JsonSerializer.Deserialize<CameraEvent>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                //if (payload?.Type == "Motion Detect")
+                if (payload?.Type == "Motion Detect")
                 {
                     if (payload.Status == 1)
                     {
-                        Console.WriteLine("Start recording");
-                        //StartRecording("rtsp://192.168.1.8:554/stream1", $@"c:\temp\camera\{DateTime.Now:yyyy-MM-dd HH.mm.ss}_%03d.mp4");
+                        _logger.LogInformation("Detect motion on camera");
                     }
                     else if (payload.Status == 0)
                     {
-                        Console.WriteLine("Stop recording");
-                        //StopRecording();
+                        _logger.LogInformation("Ent motion on camera");
                     }
                 }
 

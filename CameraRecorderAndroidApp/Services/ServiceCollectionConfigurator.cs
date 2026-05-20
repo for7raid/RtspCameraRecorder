@@ -39,6 +39,7 @@ namespace CameraRecorderAndroidApp.Services
             services.AddKeyedSingleton<IH26xDecoder>("OnBufferDecoder", (sp, _) => { return new H265Decoder(640, 480, sp.GetRequiredService<ILogger<H265Decoder>>()); });
 
             services.AddSingleton<LogWebServer>(sp => new LogWebServer(8080, logsDir, sp.GetRequiredService<ILogger<LogWebServer>>()));
+            services.AddSingleton<AlarmWebServer>();
 
             services.AddLogging(builder =>
             {

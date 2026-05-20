@@ -33,7 +33,7 @@ namespace CameraRecorderAndroidApp.Activities
             _decoderScreen = (H265Decoder)serviceProvider.GetRequiredKeyedService<IH26xDecoder>("OnScreenDecoder");
             _logger = serviceProvider.GetRequiredService<ILogger<MainActivity>>();
             _webServer = serviceProvider.GetRequiredService<LogWebServer>();
-
+            _ = serviceProvider.GetService<AlarmWebServer>();
 
 
             _rtspMotionDetector.DetectionLog += (log) =>
@@ -71,7 +71,7 @@ namespace CameraRecorderAndroidApp.Activities
 
                     txtLastRecording.Visibility = ViewStates.Visible;
                     txtRecordingStatus.Visibility = ViewStates.Gone;
-                    txtLastRecording.Text = "🏃‍ "+ DateTime.Now.ToString("HH:mm");
+                    txtLastRecording.Text = "🏃‍ " + DateTime.Now.ToString("HH:mm");
                 });
             };
         }

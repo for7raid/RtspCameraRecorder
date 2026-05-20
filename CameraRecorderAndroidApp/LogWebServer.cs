@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace CameraRecorderAndroidApp;
 
@@ -15,11 +16,13 @@ public class LogWebServer
         _logsDir = logsDir;
         _logger = logger;
         _listener.Prefixes.Add($"http://+:{port}/");
+        _listener.Prefixes.Add($"http://*:{port}/");
     }
 
     public void Start()
     {
         _listener.Start();
+
         _logger.LogInformation("Веб-сервер логов запущен на порту {Port}",
             _listener.Prefixes.First().Replace("+:", ""));
         _ = ListenLoop();
@@ -38,13 +41,13 @@ public class LogWebServer
             try
             {
                 var ctx = await _listener.GetContextAsync();
-                _ = Task.Run(() => HandleRequest(ctx));
+                _ = Task.Run(async () => await HandleRequest(ctx));
             }
             catch (HttpListenerException) { break; }
         }
     }
 
-    private void HandleRequest(HttpListenerContext ctx)
+    private async Task HandleRequest(HttpListenerContext ctx)
     {
         var path = ctx.Request.Url!.AbsolutePath.TrimEnd('/');
         var remote = ctx.Request.RemoteEndPoint?.ToString() ?? "?";
@@ -60,10 +63,55 @@ public class LogWebServer
             _logger.LogInformation("Запрос файла лога '{File}' от {Remote}", fileName, remote);
             ServeLogFile(ctx, fileName);
         }
+        else if (path == "" && ctx.Request.HttpMethod == "POST")
+        {
+            await HandleAlarmSignal(ctx);
+        }
         else
         {
             _logger.LogWarning("Неизвестный запрос '{Path}' от {Remote}", path, remote);
             ctx.Response.StatusCode = 404;
+            ctx.Response.Close();
+        }
+    }
+
+    private async Task HandleAlarmSignal(HttpListenerContext ctx)
+    {
+        try
+        {
+            Stream stream = ctx.Request.InputStream;
+
+
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+
+            while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                string jsonString = Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("\0", "");
+               _logger.LogInformation(jsonString);
+                var payload = JsonSerializer.Deserialize<CameraEvent>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (payload?.Type == "Motion Detect")
+                {
+                    if (payload.Status == 1)
+                    {
+                        _logger.LogInformation("Detect motion on camera");
+                    }
+                    else if (payload.Status == 0)
+                    {
+                        _logger.LogInformation("Ent motion on camera");
+                    }
+                }
+
+            }
+
+            ctx.Response.StatusCode = 202;
+            ctx.Response.Close();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error communicating with client");
+            ctx.Response.StatusCode = 400;
             ctx.Response.Close();
         }
     }
@@ -124,5 +172,5 @@ public class LogWebServer
         ctx.Response.Close();
     }
 
-
+    sealed record CameraEvent(string Type, int Status);
 }
