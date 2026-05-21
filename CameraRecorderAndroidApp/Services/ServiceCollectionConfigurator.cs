@@ -55,8 +55,8 @@ namespace CameraRecorderAndroidApp.Services
 
                 var log = new LoggerConfiguration()
                     .WriteTo.File(
-                        path: Path.Combine(logsDir, $@"log-{DateTime.Now:yyyy-MM-dd HH.mm.ss}.txt"),
-                        rollingInterval: RollingInterval.Infinite,
+                        path: Path.Combine(logsDir, $@"log.txt"),
+                        rollingInterval: RollingInterval.Day,
                         rollOnFileSizeLimit: true,
                         fileSizeLimitBytes: 1_048_576/*1Mb*/,
                         buffered: true,

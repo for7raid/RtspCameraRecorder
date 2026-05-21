@@ -23,7 +23,8 @@ namespace CameraRecorderAndroidApp.Activities
         private ILogger<MainActivity> _logger;
         private readonly LogWebServer _webServer;
 
-        
+        private readonly CircularBuffer<DateTime> _lastRecords = new(5);
+
         public MainActivity()
         {
             var serviceProvider = ServiceCollectionConfigurator.Instance;
@@ -41,8 +42,8 @@ namespace CameraRecorderAndroidApp.Activities
             {
                 RunOnUiThread(() => { txtMotionLog!.Text = log; });
             };
-            //_rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
-            //_rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecord(); };
+            _rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
+            _rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecord(); };
 
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {
@@ -72,7 +73,12 @@ namespace CameraRecorderAndroidApp.Activities
 
                     txtLastRecording.Visibility = ViewStates.Visible;
                     txtRecordingStatus.Visibility = ViewStates.Gone;
-                    txtLastRecording.Text = "🏃‍ " + DateTime.Now.ToString("HH:mm");
+
+                    _lastRecords.Add(DateTime.Now);
+
+
+
+                    txtLastRecording.Text = _lastRecords.Ordered.Select(d => "🏃‍ " + d.ToString("HH:mm")).Aggregate((a, v) => a + "    " + v);
                 });
             };
         }
