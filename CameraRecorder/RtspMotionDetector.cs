@@ -48,7 +48,7 @@ public class RtspMotionDetector
 
             // Ключевые параметры
             ChangedBlocksRatioThreshold = 0.008,  // 0.8%
-            SigmaThreshold = 2.5,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
+            SigmaThreshold = 3,                  // 3 сигмы: баланс чувствительности и помехоустойчивости
 
             MinFramesBeforeDetection = 10,
             StatsRecalculationPeriod = 30,
@@ -85,7 +85,7 @@ public class RtspMotionDetector
                 {
                     _lastMotionTime = null;
                     MotionEnded?.Invoke();
-                    _logger.LogInformation("Motion ended");
+                    //_logger.LogInformation("Motion ended");
 
                 }
 
@@ -104,7 +104,7 @@ public class RtspMotionDetector
         {
             _lastMotionTime = DateTime.Now;
             MotionDetected?.Invoke();
-            _logger.LogInformation("Motion detected");
+            //_logger.LogInformation("Motion detected");
         }
     }
 

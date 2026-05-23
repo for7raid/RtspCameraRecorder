@@ -84,7 +84,7 @@ public class RtspRecorder
         {
             _isRecording = true;
             _bufferVideoStorage.StartRecord();
-            _logger.LogInformation("Запись началась");
+            //_logger.LogInformation("Запись началась");
             RecordingStarted?.Invoke();
         }
     }
@@ -96,7 +96,7 @@ public class RtspRecorder
             _isRecording = false;
             var frames = _bufferVideoStorage.DumpAndStopRecord();
             _framesDumper.ProcessFrames(frames.videoFrames, frames.audioFrames);
-            _logger.LogInformation("Запись остановлена");
+            //_logger.LogInformation("Запись остановлена");
             RecordingStopped?.Invoke();
             RecordingDurationChanged?.Invoke(TimeSpan.Zero);
         }

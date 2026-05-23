@@ -103,7 +103,7 @@ public class RingBufferStorage
         if (_isRecording) return;
         _isRecording = true;
         _videoBuffer.TryPeek(out var oldestFrame);
-        _logger.LogInformation($"Start video recodring {DateTime.Now:yyyy-MM-dd HH:mm:ss}, firts frame {oldestFrame?.Timestamp::yyyy-MM-dd HH:mm:ss}, duration {_currentBufferDurationMs}, frames count {_videoBuffer.Count}");
+        _logger.LogInformation($"Start video recording {DateTime.Now:yyyy-MM-dd HH:mm:ss}, first frame {oldestFrame?.Timestamp:yyyy-MM-dd HH:mm:ss}, buffer duration {_currentBufferDurationMs / 1000:0} sec, frames count {_videoBuffer.Count}");
     }
 
     public (List<VideoFrame> videoFrames, List<AudioFrame> audioFrames) DumpAndStopRecord()
@@ -115,6 +115,9 @@ public class RingBufferStorage
         {
             videoFramesToSave = _videoBuffer.ToList();
             audioFramesToSave = _audioBuffer.ToList();
+
+            _logger.LogInformation($"Stop video recording {DateTime.Now:yyyy-MM-dd HH:mm:ss}, {videoFramesToSave[0]?.Timestamp:yyyy-MM-dd HH:mm:ss}-{videoFramesToSave[^1]?.Timestamp:yyyy-MM-dd HH:mm:ss}, duration {videoFramesToSave[^1]?.Timestamp - videoFramesToSave[0]?.Timestamp}, frames count {videoFramesToSave.Count}");
+
 
             _isRecording = false;
 
