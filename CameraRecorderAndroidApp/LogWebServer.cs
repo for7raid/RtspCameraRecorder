@@ -57,11 +57,17 @@ public class LogWebServer
             _logger.LogInformation("Запрос списка логов от {Remote}", remote);
             ServeLogList(ctx);
         }
-        else if (path.StartsWith("/logs/"))
+        else if (path.StartsWith("/logs/") && ctx.Request.HttpMethod == "GET")
         {
             var fileName = Uri.UnescapeDataString(path.Substring(6));
             _logger.LogInformation("Запрос файла лога '{File}' от {Remote}", fileName, remote);
             ServeLogFile(ctx, fileName);
+        }
+        else if (path.StartsWith("/logs/") && ctx.Request.HttpMethod == "DELETE")
+        {
+            var fileName = Uri.UnescapeDataString(path.Substring(6));
+            _logger.LogInformation("Запрос удаления лога '{File}' от {Remote}", fileName, remote);
+            ServeDeleteLog(ctx, fileName);
         }
         else if (path == "" && ctx.Request.HttpMethod == "POST")
         {
@@ -88,7 +94,7 @@ public class LogWebServer
             while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
             {
                 string jsonString = Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("\0", "");
-               _logger.LogInformation(jsonString);
+                _logger.LogInformation(jsonString);
                 var payload = JsonSerializer.Deserialize<CameraEvent>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                 if (payload?.Type == "Motion Detect")
@@ -121,14 +127,17 @@ public class LogWebServer
         if (!Directory.Exists(_logsDir))
         {
             _logger.LogDebug("Директория логов не найдена: {Dir}", _logsDir);
-            WriteHtml(ctx, LoadTemplate().Replace("{{ROWS}}", "<tr><td colspan='2'>Нет логов</td></tr>"));
+            WriteHtml(ctx, LoadTemplate().Replace("{{ROWS}}", "<tr><td colspan='3'>Нет логов</td></tr>"));
             return;
         }
 
         var files = Directory.GetFiles(_logsDir, "*.txt")
             .Select(f => new FileInfo(f))
             .OrderByDescending(f => f.CreationTime)
-            .Select(f => $"<tr><td><a href='/logs/{Uri.EscapeDataString(f.Name)}'>{f.Name}</a></td><td class='size'>{FormatSize(f.Length)}</td></tr>")
+            .Select(f => LoadRowTemplate()
+                .Replace("{{URL}}", Uri.EscapeDataString(f.Name))
+                .Replace("{{NAME}}", f.Name)
+                .Replace("{{SIZE}}", FormatSize(f.Length)))
             .ToArray();
 
         var rows = files.Length > 0 ? string.Join("\n", files) : "<tr><td colspan='2'>Нет логов</td></tr>";
@@ -138,6 +147,13 @@ public class LogWebServer
     private static string LoadTemplate()
     {
         using var stream = Android.App.Application.Context.Resources!.OpenRawResource(Resource.Raw.logs_template);
+        using var reader = new System.IO.StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static string LoadRowTemplate()
+    {
+        using var stream = Android.App.Application.Context.Resources!.OpenRawResource(Resource.Raw.logs_row_template);
         using var reader = new System.IO.StreamReader(stream);
         return reader.ReadToEnd();
     }
@@ -169,6 +185,23 @@ public class LogWebServer
         ctx.Response.ContentType = "text/plain; charset=utf-8";
         using var fs = File.OpenRead(path);
         fs.CopyTo(ctx.Response.OutputStream);
+        ctx.Response.Close();
+    }
+
+    private void ServeDeleteLog(HttpListenerContext ctx, string fileName)
+    {
+        var filePath = Path.Combine(_logsDir, fileName);
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+            _logger.LogInformation("Лог удалён: {File}", fileName);
+            ctx.Response.StatusCode = 200;
+        }
+        else
+        {
+            _logger.LogWarning("Файл для удаления не найден: {File}", fileName);
+            ctx.Response.StatusCode = 404;
+        }
         ctx.Response.Close();
     }
 
