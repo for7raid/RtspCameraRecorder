@@ -90,12 +90,14 @@ public class RtspRecorder
         }
     }
 
-    public void StopRecord()
+    public void StopRecord(DateTime? lastMotionTime = null)
     {
         if (_isRecording)
         {
             _isRecording = false;
-            var frames = _bufferVideoStorage.DumpAndStopRecord();
+            DateTime toTime = lastMotionTime.HasValue ? lastMotionTime.Value.AddSeconds(_options.Value.PostMotionDurationSec) : DateTime.Now;
+
+            var frames = _bufferVideoStorage.DumpAndStopRecord(toTime);
             _framesDumper.ProcessFrames(frames.videoFrames, frames.audioFrames);
             //_logger.LogInformation("Запись остановлена");
             RecordingStopped?.Invoke();

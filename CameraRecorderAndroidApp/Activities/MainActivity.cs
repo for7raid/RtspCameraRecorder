@@ -40,7 +40,7 @@ namespace CameraRecorderAndroidApp.Activities
                 RunOnUiThread(() => { txtMotionLog!.Text = log; });
             };
             _rtspMotionDetector.MotionDetected += () => { _rtspRecorder.StartRecord(); };
-            _rtspMotionDetector.MotionEnded += () => { _rtspRecorder.StopRecord(); };
+            _rtspMotionDetector.MotionEnded += (lastMotionTime) => { _rtspRecorder.StopRecord(lastMotionTime); };
 
             _rtspRecorder.RecordingDurationChanged += (duration) =>
             {
@@ -100,10 +100,11 @@ namespace CameraRecorderAndroidApp.Activities
                     h265Decoder.SetOutputSurface(surfaceView.Holder!.Surface);
                 }
 
-                _rtspRecorder.Start();
-                _rtspMotionDetector.Start();
             },
             () => _rtspRecorder.Stop()));
+
+            _rtspRecorder.Start();
+            _rtspMotionDetector.Start();
 
             _webServer.Start();
 

@@ -20,7 +20,7 @@ public class RtspMotionDetector
 
     public event Action<byte[], ulong>? FrameReceived;
     public event Action? MotionDetected;
-    public event Action? MotionEnded;
+    public event Action<DateTime>? MotionEnded;
     public event Action<string>? DetectionLog;
 
 
@@ -81,10 +81,10 @@ public class RtspMotionDetector
         {
             if (_lastMotionTime.HasValue)
             {
-                if ((DateTime.Now - _lastMotionTime.Value).TotalSeconds > _options.Value.PostMotionDurationSec)
+                if ((DateTime.Now - _lastMotionTime.Value).TotalSeconds > 20) //20 секунд ждем еще движение
                 {
+                    MotionEnded?.Invoke(_lastMotionTime.Value);
                     _lastMotionTime = null;
-                    MotionEnded?.Invoke();
                     //_logger.LogInformation("Motion ended");
 
                 }

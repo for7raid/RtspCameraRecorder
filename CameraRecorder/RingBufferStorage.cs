@@ -53,7 +53,7 @@ public class RingBufferStorage
                 {
                     //Удаляем кадры, которые старее 10 секунд или кадры из середины
                     VideoFrame f;
-                    while (_currentBufferDurationMs > maxDurationMs && _videoBuffer.TryDequeue(out f) || 
+                    while (_currentBufferDurationMs > maxDurationMs && _videoBuffer.TryDequeue(out f) ||
                         _videoBuffer.TryPeek(out f) && f.UnitType != NalUnitType.H265_VPS && _videoBuffer.TryDequeue(out f))
                     {
                         _currentBufferDurationMs = (long)(timestamp - f.Timestamp).TotalMilliseconds;
@@ -106,20 +106,20 @@ public class RingBufferStorage
         _logger.LogInformation($"Start video recording {DateTime.Now:yyyy-MM-dd HH:mm:ss}, first frame {oldestFrame?.Timestamp:yyyy-MM-dd HH:mm:ss}, buffer duration {_currentBufferDurationMs / 1000:0} sec, frames count {_videoBuffer.Count}");
     }
 
-    public (List<VideoFrame> videoFrames, List<AudioFrame> audioFrames) DumpAndStopRecord()
+    public (List<VideoFrame> videoFrames, List<AudioFrame> audioFrames) DumpAndStopRecord(DateTime toTime)
     {
         List<VideoFrame> videoFramesToSave;
         List<AudioFrame> audioFramesToSave;
 
         lock (_lockObj)
         {
-            videoFramesToSave = _videoBuffer.ToList();
-            audioFramesToSave = _audioBuffer.ToList();
+            videoFramesToSave = _videoBuffer.Where(f => f.Timestamp < toTime).ToList();
+            audioFramesToSave = _audioBuffer.Where(f => f.Timestamp < toTime).ToList();
 
             if (videoFramesToSave.Count > 0)
             {
-                var firstFrame = _videoBuffer.FirstOrDefault();
-                var lastFrame = _videoBuffer.LastOrDefault();
+                var firstFrame = videoFramesToSave.FirstOrDefault();
+                var lastFrame = videoFramesToSave.LastOrDefault();
                 _logger.LogInformation($"Stop video recording {DateTime.Now:yyyy-MM-dd HH:mm:ss}, {firstFrame?.Timestamp:yyyy-MM-dd HH:mm:ss}-{lastFrame?.Timestamp:yyyy-MM-dd HH:mm:ss}, duration {lastFrame?.Timestamp - firstFrame?.Timestamp}, frames count {videoFramesToSave.Count}");
             }
 

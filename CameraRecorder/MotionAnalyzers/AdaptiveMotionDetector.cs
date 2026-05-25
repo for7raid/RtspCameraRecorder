@@ -570,18 +570,6 @@ public class AdaptiveMotionDetector
             bool rawMotion = changedMap.changedRatio >= _settings.ChangedBlocksRatioThreshold;
             bool filteredMotion = FilterSpikes(rawMotion);
 
-            //При включении или выключении света резкое изменение почти всего фона. Обновляем принудительно статистику освещения и выходим.
-            if (changedMap.changedRatio > 0.8)
-            {
-                filteredMotion = false;
-                UpdateLightingStatsPeriodic(currentMap, force: true);
-                _framesProcessed = 0;
-                _emaBackground = null;
-                _emaBgOut = null;
-
-                _logger.LogInformation("Всплеск яркости");
-            }
-
             // Заполняем результат
             result.HasMotion = filteredMotion;
             result.ChangedBlocksCount = changedMap.changedCount;
@@ -593,8 +581,20 @@ public class AdaptiveMotionDetector
             result.CurrentThreshold = threshold;
             result.IsAdapting = _framesProcessed < _settings.MinFramesBeforeDetection;
             result.ProcessingTimeMs = (DateTime.Now - startTime).TotalMilliseconds;
-
-            if (filteredMotion)
+            
+            //При включении или выключении света резкое изменение почти всего фона. Обновляем принудительно статистику освещения и выходим.
+            if (changedMap.changedRatio >= 0.5)
+            {
+                result.HasMotion = false;
+                result.IsAdapting = true;
+                UpdateLightingStatsPeriodic(currentMap, force: true);
+                _framesProcessed = 0;
+                _emaBackground = null;
+                _emaBgOut = null;
+                _logger.LogInformation("Всплеск яркости: " + result.ToString());
+            
+            }
+            if (result.HasMotion)
                 _logger.LogInformation(result.ToString());
             else
                 _logger.LogDebug(result.ToString());

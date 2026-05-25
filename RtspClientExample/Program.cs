@@ -67,7 +67,7 @@ namespace RtspClientExample
             logger = serviceProvider.GetRequiredService<ILogger<Recorder>>();
 
             rtspMotionDetector.MotionDetected += () => recorder.StartRecord();
-            rtspMotionDetector.MotionEnded += () => recorder.StopRecord();
+            rtspMotionDetector.MotionEnded += (lastMotionTime) => recorder.StopRecord(lastMotionTime);
 
             recorder.Start();
             rtspMotionDetector.Start();

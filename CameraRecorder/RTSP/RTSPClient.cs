@@ -1299,6 +1299,7 @@ public class RTSPClient
         {
             this.Stop();
             this.Connect(_uri.OriginalString, _credentials.UserName, _credentials.Password, this.rtpTransport, this._mediaRequest);
+            _logger.LogWarning("Reconected " + _uri.OriginalString);
         }
     }
 }

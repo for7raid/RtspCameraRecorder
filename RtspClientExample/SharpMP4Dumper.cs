@@ -9,7 +9,6 @@ using SharpMP4.Tracks;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 
 namespace CameraRecorder
 {
