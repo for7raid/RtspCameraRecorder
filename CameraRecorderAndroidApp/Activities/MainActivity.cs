@@ -14,8 +14,6 @@ namespace CameraRecorderAndroidApp.Activities
     {
         private RtspRecorder _rtspRecorder;
         private RtspMotionDetector _rtspMotionDetector;
-        private H265Decoder _decoderDetector;
-        private readonly H265Decoder _decoderScreen;
         private TextView? txtRecordingStatus, txtLastRecording;
         private TextView? txtMotionLog;
         private Button? btnStart, btnStop;
@@ -31,8 +29,7 @@ namespace CameraRecorderAndroidApp.Activities
 
             _rtspRecorder = serviceProvider.GetRequiredService<RtspRecorder>();
             _rtspMotionDetector = serviceProvider.GetRequiredService<RtspMotionDetector>();
-            _decoderDetector = (H265Decoder)serviceProvider.GetRequiredKeyedService<IH26xDecoder>("OnBufferDecoder");
-            _decoderScreen = (H265Decoder)serviceProvider.GetRequiredKeyedService<IH26xDecoder>("OnScreenDecoder");
+
             _logger = serviceProvider.GetRequiredService<ILogger<MainActivity>>();
             _webServer = serviceProvider.GetRequiredService<LogWebServer>();
             _ = serviceProvider.GetService<AlarmWebServer>();
@@ -97,13 +94,16 @@ namespace CameraRecorderAndroidApp.Activities
             var surfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1)!;
             surfaceView.Holder!.AddCallback(new SurfaceCb(() =>
             {
-                _decoderScreen.Initialize(surfaceView.Holder!.Surface);
-                _decoderDetector.Initialize();
+
+                if (_rtspRecorder.H26XDecoder is H265Decoder h265Decoder)
+                {
+                    h265Decoder.SetOutputSurface(surfaceView.Holder!.Surface);
+                }
 
                 _rtspRecorder.Start();
                 _rtspMotionDetector.Start();
             },
-            () => _decoderScreen.Dispose()));
+            () => _rtspRecorder.Stop()));
 
             _webServer.Start();
 

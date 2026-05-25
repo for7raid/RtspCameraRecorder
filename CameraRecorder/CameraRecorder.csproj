@@ -22,4 +22,8 @@
     <PackageReference Include="SharpRTSP" Version="1.11.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="NewFolder\" />
+  </ItemGroup>
+
 </Project>

@@ -8,9 +8,10 @@ namespace CameraRecorder;
 
 public class RtspRecorder
 {
+    public IH26xDecoder? H26XDecoder { get; init; }
+
     private readonly ILogger<RtspRecorder> _logger;
     private readonly RTSPClient _client;
-    private readonly IH26xDecoder? _h26XDecoder;
     private readonly IOptions<CameraRecorderSettings> _options;
     private readonly RingBufferStorage _bufferVideoStorage;
     private readonly IFramesDumper _framesDumper;
@@ -55,7 +56,7 @@ public class RtspRecorder
         IOptions<CameraRecorderSettings> options)
     {
         _client = client;
-        _h26XDecoder = h26XDecoder;
+        H26XDecoder = h26XDecoder;
         _options = options;
         _bufferVideoStorage = bufferVideoStorage;
         _framesDumper = framesDumper;
@@ -118,7 +119,7 @@ public class RtspRecorder
                 var nal_unit_type = (NalUnitType)(nalUnit[4] & 0x1F);
                 //var unit = nalUnitMem.Slice(5);
                 _bufferVideoStorage.AddVideoFrame(nalUnitMem, nal_unit_type, dataArgs.RtpTimestamp);
-                _h26XDecoder?.DecodeFrame(nalUnitMem.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
+                H26XDecoder?.DecodeFrame(nalUnitMem.ToArray(), (long)dataArgs.RtpTimestamp, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
             }
         }
@@ -135,7 +136,7 @@ public class RtspRecorder
                 var nal_unit_type = (NalUnitType)((nalUnit[4] >> 1) & 0x3F);
                 //var unit = nalUnitMem.Slice(4);
                 _bufferVideoStorage.AddVideoFrame(nalUnitMem, nal_unit_type, dataArgs.RtpTimestamp);
-                _h26XDecoder?.DecodeFrame(nalUnit.ToArray(), 0L, nal_unit_type);
+                H26XDecoder?.DecodeFrame(nalUnit.ToArray(), 0L, nal_unit_type);
                 _logger.LogDebug("NAL Type = {nal_unit_type}", nal_unit_type);
 
                 if (_isRecording)

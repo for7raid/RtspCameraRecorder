@@ -2,6 +2,7 @@
 using Android.Media;
 using Android.Views;
 using CameraRecorder;
+using CameraRecorder.VideoDecoders;
 using Java.Nio;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -28,8 +29,8 @@ public class H265Decoder : IH26xDecoder, IDisposable
     private readonly AutoResetEvent _inputSignal = new AutoResetEvent(false);
 
     // Параметры видео
-    private readonly int _width;
-    private readonly int _height;
+    private int _width;
+    private int _height;
     private readonly ILogger<H265Decoder> _logger;
     Surface? _surface;
 
@@ -38,17 +39,21 @@ public class H265Decoder : IH26xDecoder, IDisposable
     /// </summary>
     public event EventHandler<DecodedFrameEventArgs> FrameDecoded;
 
-    public H265Decoder(int width, int height, ILogger<H265Decoder> logger)
+    public H265Decoder(ILogger<H265Decoder> logger)
     {
-        _width = width;
-        _height = height;
+
         _logger = logger;
     }
 
+    public void SetOutputSurface(Surface? surface)
+    {
+        _surface = surface;
+        _codec?.SetOutputSurface(_surface);
+    }
     /// <summary>
     /// Инициализация и запуск декодера
     /// </summary>
-    public bool Initialize(Surface? surface = null)
+    private bool Initialize()
     {
         lock (_lockObject)
         {
@@ -66,7 +71,6 @@ public class H265Decoder : IH26xDecoder, IDisposable
                     return false;
                 }
 
-                _surface = surface;
 
                 // Создаём декодер
                 _codec = MediaCodec.CreateDecoderByType(MediaFormat.MimetypeVideoHevc);
@@ -75,7 +79,7 @@ public class H265Decoder : IH26xDecoder, IDisposable
                 MediaFormat format = MediaFormat.CreateVideoFormat(MediaFormat.MimetypeVideoHevc, _width, _height);
 
                 // Важно: передаём null вместо Surface - декодируем в буферы
-                _codec.Configure(format, surface, null, MediaCodecConfigFlags.None);
+                _codec.Configure(format, _surface, null, MediaCodecConfigFlags.None);
 
                 // Запускаем декодер
                 _codec.Start();
@@ -150,6 +154,8 @@ public class H265Decoder : IH26xDecoder, IDisposable
         }
     }
 
+
+
     /// <summary>
     /// Подать H.265 данные на декодирование
     /// </summary>
@@ -157,56 +163,67 @@ public class H265Decoder : IH26xDecoder, IDisposable
     {
         try
         {
-        if (!_isRunning || h265Data == null || h265Data.Length == 0)
-            return;
-
-        switch (nalUnitType)
-        {
-            case NalUnitType.H265_SPS:
-                _sps = h265Data;
-                break;
-            case NalUnitType.H265_VPS:
-                _vps = h265Data;
-                break;
-            case NalUnitType.H265_PPS:
-                _pps = h265Data;
-                break;
-        }
-
-
-        if (_sps is not null && _vps is not null && _pps is not null
-            && nalUnitType is NalUnitType.H265_SPS or NalUnitType.H265_VPS or NalUnitType.H265_PPS)
-        {
-            _inputQueue.Enqueue(new H26xFrameData
+            if (!_isRunning && nalUnitType == NalUnitType.H265_SPS)
             {
-                Data = ConcatenateVpsSpsPps(_vps, _sps, _pps),
-                TimestampUs = 0,
-                NalUnitType = nalUnitType,
-                CodeFlag = MediaCodecBufferFlags.CodecConfig,
-            });
-            _csdSent = true;
+                var resolution = H265Parser.ParseResolution(h265Data);
+                if (resolution.HasValue)
+                {
+                    _width = resolution.Value.width;
+                    _height = resolution.Value.height;
+                    Initialize();
+                }
+            }
 
-        }
-        else if (nalUnitType is NalUnitType.H265_SPS or NalUnitType.H265_VPS or NalUnitType.H265_PPS)
-        {
-            return;
-        }
-        else if (!_csdSent)
-        {
-            return;
-        }
-        else
-        {
-            _inputQueue.Enqueue(new H26xFrameData
+            if (!_isRunning || h265Data == null || h265Data.Length == 0)
+                return;
+
+            switch (nalUnitType)
             {
-                Data = h265Data,
-                TimestampUs = timestampUs,
-                NalUnitType = nalUnitType,
-                CodeFlag = MediaCodecBufferFlags.None
+                case NalUnitType.H265_SPS:
+                    _sps = h265Data;
+                    break;
+                case NalUnitType.H265_VPS:
+                    _vps = h265Data;
+                    break;
+                case NalUnitType.H265_PPS:
+                    _pps = h265Data;
+                    break;
+            }
 
-            });
-        }
-        _inputSignal.Set();
+
+            if (_sps is not null && _vps is not null && _pps is not null
+                && nalUnitType is NalUnitType.H265_SPS or NalUnitType.H265_VPS or NalUnitType.H265_PPS)
+            {
+                _inputQueue.Enqueue(new H26xFrameData
+                {
+                    Data = ConcatenateVpsSpsPps(_vps, _sps, _pps),
+                    TimestampUs = 0,
+                    NalUnitType = nalUnitType,
+                    CodeFlag = MediaCodecBufferFlags.CodecConfig,
+                });
+                _csdSent = true;
+
+            }
+            else if (nalUnitType is NalUnitType.H265_SPS or NalUnitType.H265_VPS or NalUnitType.H265_PPS)
+            {
+                return;
+            }
+            else if (!_csdSent)
+            {
+                return;
+            }
+            else
+            {
+                _inputQueue.Enqueue(new H26xFrameData
+                {
+                    Data = h265Data,
+                    TimestampUs = timestampUs,
+                    NalUnitType = nalUnitType,
+                    CodeFlag = MediaCodecBufferFlags.None
+
+                });
+            }
+            _inputSignal.Set();
 
         }
         catch (Exception ex)
