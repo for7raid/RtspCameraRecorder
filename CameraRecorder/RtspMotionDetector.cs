@@ -148,7 +148,7 @@ public class RtspMotionDetector
         _client.Stop();
         if (!string.IsNullOrWhiteSpace(_options.Value.RtspSubStreamUrl))
         {
-            _client.Connect(_options.Value.RtspSubStreamUrl, _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_AND_AUDIO);
+            _client.Connect(_options.Value.RtspSubStreamUrl, _options.Value.RtspLogin, _options.Value.RtspPassword, RTSPClient.RTP_TRANSPORT.TCP, RTSPClient.MEDIA_REQUEST.VIDEO_ONLY);
         }
     }
 }

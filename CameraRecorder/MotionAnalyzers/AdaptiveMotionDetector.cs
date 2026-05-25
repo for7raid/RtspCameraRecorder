@@ -482,15 +482,15 @@ public class AdaptiveMotionDetector
             _framesSinceLastStats = 0;
         }
     }
-    private void UpdateLightingStatsPeriodic(byte[] brightnessMap)
+    private void UpdateLightingStatsPeriodic(byte[] brightnessMap, bool force = false)
     {
 
         _framesSinceLastStats++;
 
-        if (_framesSinceLastStats >= _settings.StatsRecalculationPeriod)
+        if (_framesSinceLastStats >= _settings.StatsRecalculationPeriod || force)
         {
             var stats = CalculateLightingStats(brightnessMap);
-            _currentLightingStats = _currentLightingStats == null
+            _currentLightingStats = _currentLightingStats == null || force
                 ? stats
                 : new LightingStats
                 {
@@ -569,6 +569,18 @@ public class AdaptiveMotionDetector
             // Определяем наличие движения
             bool rawMotion = changedMap.changedRatio >= _settings.ChangedBlocksRatioThreshold;
             bool filteredMotion = FilterSpikes(rawMotion);
+
+            //При включении или выключении света резкое изменение почти всего фона. Обновляем принудительно статистику освещения и выходим.
+            if (changedMap.changedRatio > 0.8)
+            {
+                filteredMotion = false;
+                UpdateLightingStatsPeriodic(currentMap, force: true);
+                _framesProcessed = 0;
+                _emaBackground = null;
+                _emaBgOut = null;
+
+                _logger.LogInformation("Всплеск яркости");
+            }
 
             // Заполняем результат
             result.HasMotion = filteredMotion;

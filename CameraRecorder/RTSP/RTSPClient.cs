@@ -85,6 +85,7 @@ public class RTSPClient
     private Authentication? _authentication;
     private NetworkCredential _credentials = new();
     readonly uint ssrc = 12345;
+    private MEDIA_REQUEST _mediaRequest;
     bool clientWantsVideo = false; // Client wants to receive Video
     bool clientWantsAudio = false; // Client wants to receive Audio
 
@@ -247,6 +248,7 @@ public class RTSPClient
             _credentials = new();
         }
 
+        _mediaRequest = mediaRequest;
         // We can ask the RTSP server for Video, Audio or both. If we don't want audio we don't need to SETUP the audio channal or receive it
         clientWantsVideo = mediaRequest.HasFlag(MEDIA_REQUEST.VIDEO_ONLY);
         clientWantsAudio = mediaRequest.HasFlag(MEDIA_REQUEST.AUDIO_ONLY);
@@ -281,7 +283,7 @@ public class RTSPClient
         // Connect a RTSP Listener to the RTSP Socket (or other Stream) to send RTSP messages and listen for RTSP replies
         rtspClient = new RtspListener(rtspSocket, _loggerFactory.CreateLogger<RtspListener>())
         {
-            AutoReconnect = true
+            AutoReconnect = false
         };
 
         rtspClient.MessageReceived += RtspMessageReceived;
@@ -1293,6 +1295,10 @@ public class RTSPClient
 
         keepAliveMessage.ContextData = keepAliveContext;
         keepAliveMessage.AddAuthorization(_authentication, _uri!, rtspSocket!.NextCommandIndex());
-        rtspClient?.SendMessage(keepAliveMessage);
+        if (!(rtspClient?.SendMessage(keepAliveMessage) ?? false))
+        {
+            this.Stop();
+            this.Connect(_uri.OriginalString, _credentials.UserName, _credentials.Password, this.rtpTransport, this._mediaRequest);
+        }
     }
 }
