@@ -30,7 +30,7 @@ namespace CameraRecorderAndroidApp.Services
             services.AddTransient<RtspRecorder>();
             services.AddTransient<RtspMotionDetector>();
 
-            services.AddTransient<IFramesDumper, SharpMP4MuxedDumper>();
+            services.AddTransient<IFramesDumper, SharpMP4MuxerDumper>();
 
             services.AddTransient<IStorageSink, AndroidLocalFileSink>();
             services.AddTransient<IStorageSink, FtpSink>();

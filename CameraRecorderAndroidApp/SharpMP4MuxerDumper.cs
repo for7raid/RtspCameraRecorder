@@ -9,12 +9,12 @@ using SharpMP4.Tracks;
 
 namespace CameraRecorderAndroidApp;
 
-public class SharpMP4MuxedDumper : IFramesDumper
+public class SharpMP4MuxerDumper : IFramesDumper
 {
-    private readonly ILogger<SharpMP4MuxedDumper> _logger;
+    private readonly ILogger<SharpMP4MuxerDumper> _logger;
     private readonly IEnumerable<IStorageSink> _sinks;
 
-    public SharpMP4MuxedDumper(ILogger<SharpMP4MuxedDumper> logger, IEnumerable<IStorageSink> sinks)
+    public SharpMP4MuxerDumper(ILogger<SharpMP4MuxerDumper> logger, IEnumerable<IStorageSink> sinks)
     {
         _logger = logger;
         _sinks = sinks;
