@@ -1,18 +1,17 @@
-<tr>
-    <td><a href="/rec/{{URL}}">{{NAME}}</a></td>
+<tr data-url="{{URL}}" data-name="{{NAME}}">
+    <td>{{NAME}}</td>
     <td class="size">{{SIZE}}</td>
-    <td class="del">
+    <td class="btn-col">
         <button
-            onclick="del('{{URL}}')"
-            style="
-                background: #c62828;
-                color: #fff;
-                border: none;
-                padding: 2px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-            "
+            class="btn-play"
+            onclick="playRecording('{{URL}}','{{NAME}}')"
+            title="Воспроизвести"
         >
+            ▶
+        </button>
+    </td>
+    <td class="btn-col">
+        <button class="btn-del" onclick="del('{{URL}}')" title="Удалить">
             ✕
         </button>
     </td>

@@ -1,72 +1,311 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
     <title>Записи</title>
     <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --accent: #4caf50;
+            --text: #e0e0e0;
+            --muted: #888;
+            --danger: #c62828;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: sans-serif;
-            margin: 12px;
-            background: #1a1a2e;
-            color: #e0e0e0
+            font-family: -apple-system, "Segoe UI", sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
         }
 
-        h2 {
-            color: #4caf50
+        /* ── Шапка ── */
+        .header {
+            padding: 12px 16px;
+            background: var(--surface);
+            border-bottom: 2px solid var(--accent);
         }
 
+            .header h2 {
+                color: var(--accent);
+                font-size: 18px;
+            }
+
+        /* ── Плеер ── */
+        .player {
+            display: none;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #000;
+            border-bottom: 2px solid var(--accent);
+        }
+
+            .player.active {
+                display: block;
+            }
+
+            .player video {
+                width: 100%;
+                display: block;
+                max-height: 60vh;
+                background: #000;
+            }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: var(--surface);
+            flex-wrap: wrap;
+        }
+
+            .player-controls button {
+                background: #333;
+                color: var(--text);
+                border: 1px solid #555;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 15px;
+                cursor: pointer;
+                min-width: 44px;
+                transition: background 0.15s;
+            }
+
+                .player-controls button:active {
+                    background: var(--accent);
+                }
+
+                .player-controls button.play-btn {
+                    font-size: 18px;
+                    padding: 8px 20px;
+                }
+
+        .player-title {
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 4px 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        /* ── Таблица ── */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 8px
         }
 
         th {
             text-align: left;
             padding: 10px 8px;
-            border-bottom: 2px solid #4caf50;
-            color: #4caf50
+            border-bottom: 2px solid var(--accent);
+            color: var(--accent);
+            font-size: 13px;
         }
 
         td {
             padding: 8px 8px;
-            border-bottom: 1px solid #333
+            border-bottom: 1px solid #333;
+            font-size: 14px;
         }
 
         a {
             color: #64b5f6;
-            text-decoration: none
+            text-decoration: none;
         }
 
             a:hover {
-                text-decoration: underline
+                text-decoration: underline;
             }
 
         .size {
             text-align: right;
-            color: #888
+            color: var(--muted);
+            font-size: 13px;
         }
 
-        .del {
+        .btn-col {
             text-align: center;
-            width: 40px
+            width: 36px;
+        }
+
+            .btn-col button {
+                border: none;
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+            }
+
+        .btn-play {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-del {
+            background: var(--danger);
+            color: #fff;
         }
     </style>
-    <script>
-        async function del(url) {
-            if (!confirm('Удалить ' + url + '?')) return;
-            const res = await fetch('/rec/' + url, { method: 'DELETE' });
-            if (res.ok) location.reload();
-            else alert('Ошибка удаления');
-        }
-    </script>
 </head>
 <body>
-    <h2>🎬 Записи</h2>
+    <!-- Плеер (скрыт по умолчанию) -->
+    <div class="player" id="player">
+        <video id="video" controls playsinline preload="metadata" muted></video>
+        <div class="player-title" id="playerTitle"></div>
+        <div class="player-controls">
+            <button onclick="playerPrev()" title="Предыдущая запись">
+                ⏮
+            </button>
+            <button class="play-btn"
+                    id="playPauseBtn"
+                    onclick="togglePlay()">
+                ▶️
+            </button>
+            <button onclick="playerNext()" title="Следующая запись">
+                ⏭
+            </button>
+            <button onclick="closePlayer()"
+                    title="Закрыть плеер"
+                    style="margin-left: 12px">
+                ✕
+            </button>
+        </div>
+    </div>
+
+    <div class="header"><h2>🎬 Записи</h2></div>
+
     <table>
-        <tr><th>Файл</th><th class="size">Размер</th><th class="del"></th></tr>
+        <tr>
+            <th>Файл</th>
+            <th class="size">Размер</th>
+            <th class="btn-col">▶</th>
+            <th class="btn-col">✕</th>
+        </tr>
         {{ROWS}}
     </table>
+
+    <script>
+        // Глобальный плейлист
+        const playlist = [];
+
+        // Заполняется из строк таблицы при загрузке
+        document.querySelectorAll("tr[data-url]").forEach((row) => {
+            playlist.push({
+                url: row.dataset.url,
+                name: row.dataset.name,
+            });
+        });
+
+        playlist.sort((a, b) => a.name.localeCompare(b.name));
+
+        let currentIndex = -1;
+        const player = document.getElementById("player");
+        const video = document.getElementById("video");
+        const titleEl = document.getElementById("playerTitle");
+        const btn = document.getElementById("playPauseBtn");
+
+        function playRecording(url, name) {
+            currentIndex = playlist.findIndex((r) => r.url === url);
+            player.classList.add("active");
+            video.src = "/rec/" + url;
+            video.load();
+            video.play().catch(() => { });
+            titleEl.textContent = name;
+            btn.textContent = "⏸";
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        function playerPrev() {
+            if (playlist.length === 0) return;
+            let idx =
+                currentIndex <= 0 ? playlist.length - 1 : currentIndex - 1;
+            playRecording(playlist[idx].url, playlist[idx].name);
+        }
+
+        function playerNext() {
+            if (playlist.length === 0) return;
+            let idx =
+                currentIndex >= playlist.length - 1 ? 0 : currentIndex + 1;
+            playRecording(playlist[idx].url, playlist[idx].name);
+        }
+
+        function togglePlay() {
+            if (video.paused) {
+                video.play().catch(() => { });
+                btn.textContent = "⏸";
+            } else {
+                video.pause();
+                btn.textContent = "▶️";
+            }
+        }
+
+        function closePlayer() {
+            video.pause();
+            video.removeAttribute("src");
+            video.load();
+            player.classList.remove("active");
+            currentIndex = -1;
+        }
+
+        // Синхронизация кнопки с событиями видео
+        video.addEventListener("play", () => (btn.textContent = "⏸"));
+        video.addEventListener("pause", () => (btn.textContent = "▶️"));
+        video.addEventListener("ended", () => {
+            btn.textContent = "▶️";
+            playerNext();
+        });
+
+        // Клавиатура: пробел = пауза, стрелки = prev/next
+        document.addEventListener("keydown", (e) => {
+            if (
+                e.target.tagName === "INPUT" ||
+                e.target.tagName === "TEXTAREA"
+            )
+                return;
+            if (!player.classList.contains("active")) return;
+
+            switch (e.key) {
+                case " ":
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case "ArrowLeft":
+                    e.preventDefault();
+                    playerPrev();
+                    break;
+                case "ArrowRight":
+                    e.preventDefault();
+                    playerNext();
+                    break;
+                case "Escape":
+                    e.preventDefault();
+                    closePlayer();
+                    break;
+            }
+        });
+
+        // Удаление записи
+        async function del(url) {
+            if (!confirm("Удалить " + decodeURIComponent(url) + "?"))
+                return;
+            const res = await fetch("/rec/" + url, { method: "DELETE" });
+            if (res.ok) location.reload();
+            else alert("Ошибка удаления");
+        }
+    </script>
 </body>
 </html>
