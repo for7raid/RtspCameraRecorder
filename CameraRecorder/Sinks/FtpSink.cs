@@ -1,7 +1,8 @@
 using CameraRecorder.Settings;
+using FluentFTP;
+using FluentFTP.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net;
 
 namespace CameraRecorder.Sinks;
 
@@ -21,6 +22,7 @@ public sealed class FtpSink : IStorageSink
     public async Task SaveAsync(string fileName, byte[] data)
     {
         var settings = _options.Value;
+
         if (!settings.FtpEnabled)
         {
             _logger.LogDebug("FtpSink: FTP отключён, пропускаю");
@@ -33,58 +35,91 @@ public sealed class FtpSink : IStorageSink
             return;
         }
 
-        var uri = BuildUri(settings, fileName);
+        var remotePath = BuildRemotePath(settings, fileName);
 
-        _logger.LogDebug("FtpSink: загружаю {FileName} на {Uri}", fileName, uri);
+        _logger.LogDebug("FtpSink: загружаю {FileName} на {Path}", fileName, remotePath);
 
         try
         {
-#pragma warning disable SYSLIB0014
-            var request = (FtpWebRequest)WebRequest.Create(uri);
-#pragma warning restore SYSLIB0014
-            request.Method = WebRequestMethods.Ftp.UploadFile;
-            request.Credentials = new NetworkCredential(settings.FtpLogin, settings.FtpPassword);
-            request.EnableSsl = settings.UseFtps;
-            request.UsePassive = true;
-            request.KeepAlive = false;
-            request.Timeout = 30_000;
-            request.ReadWriteTimeout = 30_000;
+            using var ftp = CreateClient(settings);
 
+            await ftp.AutoConnect();
 
-            using var stream = new MemoryStream(data);
-            using var requestStream = await request.GetRequestStreamAsync();
-            await stream.CopyToAsync(requestStream);
+            await ftp.UploadBytes(data, remotePath, createRemoteDir: true);
 
-            using var response = (FtpWebResponse)await request.GetResponseAsync();
-            _logger.LogInformation("Файл загружен на FTP: {Uri} — {Status}", uri, response.StatusDescription);
+            await ftp.Disconnect();
+
+            _logger.LogInformation("Файл загружен на FTP: {Path} ({Size} байт)", remotePath, data.Length);
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("FtpSink: загрузка отменена {FileName}", fileName);
         }
-        catch (WebException ex) when (ex.Status == WebExceptionStatus.RequestCanceled)
+        catch (FtpException ex)
         {
-            _logger.LogWarning("FtpSink: загрузка отменена {FileName}", fileName);
+            _logger.LogError(ex, "FtpSink: ошибка FTP: {FileName}", fileName);
         }
-        catch (WebException ex)
-        {
-            var ftpResponse = ex.Response as FtpWebResponse;
-            _logger.LogError(ex, "FtpSink: ошибка FTP ({Status}): {FileName}",
-                ftpResponse?.StatusDescription ?? ex.Status.ToString(), fileName);
-        }
-    }
-
-    private Uri BuildUri(CameraRecorderSettings settings, string fileName)
-    {
-        var scheme = "ftp";// settings.UseFtps ? "ftps" : "ftp";
-        var host = settings.FtpHost.TrimEnd('/');
-        var path = settings.FtpDirectory + (fileName.StartsWith('/') ? fileName : "/" + fileName);
-        return new Uri($"{scheme}://{host}{path}");
     }
 
     public async Task<(string newFilePath, bool isMoved)> SaveAsync(string fileName, string tmpDataFilePath)
     {
-        await SaveAsync(fileName, File.ReadAllBytes(tmpDataFilePath));
-        return (tmpDataFilePath, false);
+        var settings = _options.Value;
+        var remotePath = BuildRemotePath(settings, fileName);
+
+        try
+        {
+            using var ftp = CreateClient(settings);
+
+            await ftp.AutoConnect();
+
+            await ftp.UploadFile(tmpDataFilePath, remotePath, createRemoteDir: true);
+
+            await ftp.Disconnect();
+
+            _logger.LogInformation("Файл загружен на FTP: {Path}", remotePath);
+
+            return (tmpDataFilePath, false);
+        }
+        catch (FtpException ex)
+        {
+            _logger.LogError(ex, "FtpSink: ошибка FTP при загрузке {FileName}",
+                fileName);
+
+            return (tmpDataFilePath, false);
+        }
+    }
+
+    // ── helpers ──
+
+    private static AsyncFtpClient CreateClient(CameraRecorderSettings settings)
+    {
+        var client = new AsyncFtpClient(settings.FtpHost, settings.FtpLogin, settings.FtpPassword);
+
+        if (settings.UseFtps)
+        {
+            client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
+            client.Config.ValidateAnyCertificate = true;   // для самоподписанных сертификатов
+        }
+
+        client.Config.ConnectTimeout = 15_000;
+        client.Config.DataConnectionConnectTimeout = 15_000;
+        client.Config.DataConnectionReadTimeout = 30_000;
+        client.Config.SocketKeepAlive = true;
+        client.Config.RetryAttempts = 2;
+
+        return client;
+    }
+
+    private static string BuildRemotePath(CameraRecorderSettings s, string fileName)
+    {
+        var dir = (s.FtpDirectory ?? string.Empty).TrimEnd('/');
+        var name = fileName.StartsWith('/') ? fileName : "/" + fileName;
+        return dir + name;
+    }
+
+    private static string? GetDirectoryName(string path)
+    {
+        var idx = path.LastIndexOf('/');
+        return idx > 0 ? path[..idx] : null;
     }
 }
