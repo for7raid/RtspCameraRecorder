@@ -18,12 +18,11 @@ namespace CameraRecorderAndroidApp.Services
 
         static ServiceCollectionConfigurator()
         {
-            string logsDir = Path.Combine(Android.App.Application.Context.FilesDir!.AbsolutePath, "logs");
+            string logsDir = Path.Combine(Android.App.Application.Context.CacheDir!.AbsolutePath, "logs");
             Directory.CreateDirectory(logsDir);
 
             var services = new ServiceCollection();
 
-            services.AddTransient<AndroidLocalFileSink>();
             services.AddTransient<RingBufferStorage>();
 
             services.AddTransient<RTSPClient>();
@@ -37,8 +36,10 @@ namespace CameraRecorderAndroidApp.Services
 
             services.AddTransient<IH26xDecoder, H265Decoder>();
 
-            services.AddSingleton<LogWebServer>(sp => new LogWebServer(8080, logsDir, sp.GetRequiredService<IOptions<CameraRecorderSettings>>().Value.LocalStorage?.Path ?? "", sp.GetRequiredService<ILogger<LogWebServer>>()));
+            services.AddSingleton<LogWebServer>();
             services.AddSingleton<AlarmWebServer>();
+
+            services.AddKeyedSingleton("LogsDirectory", (_, _) => logsDir);
 
             services.AddLogging(builder =>
             {
