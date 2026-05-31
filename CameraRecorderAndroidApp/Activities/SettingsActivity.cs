@@ -12,7 +12,7 @@ public class SettingsActivity : Activity
 
     private EditText? etRtspMain, etRtspSub, etRtspLogin, etRtspPassword;
     private Switch? swLocalEnabled;
-    private EditText? etLocalPath;
+    private EditText? etLocalPath, etLocalMaxAge, etLocalMaxStorage;
     private Switch? swFtpEnabled, swFtps;
     private EditText? etFtpHost, etFtpLogin, etFtpPassword, etFtpDir, etFtpMaxAge, etFtpMaxStorage;
     private Button? btnFtpTest;
@@ -38,6 +38,8 @@ public class SettingsActivity : Activity
         // Локальное хранилище
         swLocalEnabled = FindViewById<Switch>(Resource.Id.swLocalStorageEnabled)!;
         etLocalPath = FindViewById<EditText>(Resource.Id.etLocalRecordingsPath)!;
+        etLocalMaxAge = FindViewById<EditText>(Resource.Id.etLocalMaxFileAge)!;
+        etLocalMaxStorage = FindViewById<EditText>(Resource.Id.etLocalMaxStorage)!;
         var btnPickFolder = FindViewById<Button>(Resource.Id.btnPickFolder)!;
         btnPickFolder.Click += (_, _) =>
         {
@@ -153,8 +155,12 @@ public class SettingsActivity : Activity
         etRtspSub.Text = s.RtspSubStreamUrl;
         etRtspLogin.Text = s.RtspLogin;
         etRtspPassword.Text = s.RtspPassword;
-        swLocalEnabled.Checked = s.LocalStorageEnabled;
-        etLocalPath.Text = s.LocalRecordingsPath;
+
+        var local = s.LocalStorage;
+        swLocalEnabled.Checked = local?.Enabled ?? false;
+        etLocalPath.Text = local?.Path ?? "";
+        etLocalMaxAge.Text = local?.MaxFileAgeDays.ToString() ?? "10";
+        etLocalMaxStorage.Text = local?.MaxStorageSizeMb.ToString() ?? "2048";
 
         var ftp = s.Ftp;
         swFtpEnabled.Checked = ftp?.Enabled ?? false;
@@ -178,7 +184,7 @@ public class SettingsActivity : Activity
         if (requestCode == 42 && resultCode == Result.Ok && data?.Data != null)
         {
             var uri = data.Data;
-            var path = Android.Net.Uri.Decode(uri.LastPathSegment ?? "");
+            var path = Android.Net.Uri.Decode(uri.LastPathSegment ?? "") ?? string.Empty;
             if (path.StartsWith("primary:"))
                 path = path.Substring("primary:".Length);
             if (path.StartsWith("/tree/"))
@@ -196,6 +202,7 @@ public class SettingsActivity : Activity
 
     private CameraRecorderSettings Collect()
     {
+        var localEnabled = swLocalEnabled?.Checked ?? false;
         var ftpEnabled = swFtpEnabled?.Checked ?? false;
 
         return new CameraRecorderSettings
@@ -204,22 +211,25 @@ public class SettingsActivity : Activity
             RtspSubStreamUrl = etRtspSub?.Text ?? "",
             RtspLogin = etRtspLogin?.Text ?? "",
             RtspPassword = etRtspPassword?.Text ?? "",
-            LocalStorageEnabled = swLocalEnabled?.Checked ?? true,
-            LocalRecordingsPath = etLocalPath?.Text ?? "",
+            LocalStorage = new LocalStorageSettings
+            {
+                Enabled = true,
+                Path = etLocalPath?.Text ?? "",
+                MaxFileAgeDays = int.TryParse(etLocalMaxAge?.Text, out var age) ? age : 10,
+                MaxStorageSizeMb = int.TryParse(etLocalMaxStorage?.Text, out var size) ? size : 2048,
+            },
 
-            Ftp = ftpEnabled
-                ? new FtpSettings
-                {
-                    Enabled = true,
-                    Host = etFtpHost?.Text ?? "",
-                    Login = etFtpLogin?.Text ?? "",
-                    Password = etFtpPassword?.Text ?? "",
-                    Directory = etFtpDir?.Text ?? "",
-                    UseFtps = swFtps?.Checked ?? false,
-                    MaxFileAgeDays = int.TryParse(etFtpMaxAge?.Text, out var age) ? age : 10,
-                    MaxStorageSizeMb = int.TryParse(etFtpMaxStorage?.Text, out var size) ? size : 2048,
-                }
-                : null,
+            Ftp = new FtpSettings
+            {
+                Enabled = true,
+                Host = etFtpHost?.Text ?? "",
+                Login = etFtpLogin?.Text ?? "",
+                Password = etFtpPassword?.Text ?? "",
+                Directory = etFtpDir?.Text ?? "",
+                UseFtps = swFtps?.Checked ?? false,
+                MaxFileAgeDays = int.TryParse(etFtpMaxAge?.Text, out var ageF) ? ageF : 10,
+                MaxStorageSizeMb = int.TryParse(etFtpMaxStorage?.Text, out var sizeF) ? sizeF : 2048,
+            },
 
             PreMotionDurationSec = sbPreMotion?.Progress ?? 10,
             PostMotionDurationSec = sbPostMotion?.Progress ?? 10,

@@ -97,6 +97,20 @@
           android:minWidth="48dp" />
     </LinearLayout>
 
+    <EditText
+        android:id="@+id/etLocalMaxFileAge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Срок хранения, дней"
+        android:inputType="number" />
+
+    <EditText
+        android:id="@+id/etLocalMaxStorage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Макс. размер хранилища, МБ"
+        android:inputType="number" />
+
     <!-- FTP -->
     <TextView
         android:layout_width="wrap_content"

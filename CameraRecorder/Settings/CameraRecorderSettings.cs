@@ -23,14 +23,9 @@ public class CameraRecorderSettings
     public string RtspPassword { get; init; } = string.Empty;
 
     /// <summary>
-    /// Локальное хранилище активно
+    /// Настройки локального хранилища. Если null — локальное сохранение не используется.
     /// </summary>
-    public bool LocalStorageEnabled { get; init; } = true;
-
-    /// <summary>
-    /// Локальный путь для хранения записей
-    /// </summary>
-    public string LocalRecordingsPath { get; init; } = string.Empty;
+    public LocalStorageSettings? LocalStorage { get; init; }
 
     /// <summary>
     /// Настройки FTP-хранилища. Если null — FTP не используется.
@@ -53,7 +48,10 @@ public class CameraRecorderSettings
         RtspSubStreamUrl = "rtsp://192.168.1.8:554/stream2",
         RtspLogin = "admin",
         RtspPassword = "123456",
-        LocalStorageEnabled = true,
-        LocalRecordingsPath = "DCIM/camera",
+        LocalStorage = new LocalStorageSettings
+        {
+            Enabled = true,
+            Path = "DCIM/camera",
+        },
     };
 }

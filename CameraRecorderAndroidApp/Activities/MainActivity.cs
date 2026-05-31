@@ -101,7 +101,14 @@ namespace CameraRecorderAndroidApp.Activities
                 }
 
             },
-            () => _rtspRecorder.Stop()));
+            () =>
+            {
+                if (_rtspRecorder.H26XDecoder is H265Decoder h265Decoder)
+                {
+                    h265Decoder.DetachOutputSurface();
+                }
+
+            }));
 
             _rtspRecorder.Start();
             _rtspMotionDetector.Start();

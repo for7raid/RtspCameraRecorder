@@ -47,8 +47,17 @@ public class H265Decoder : IH26xDecoder, IDisposable
 
     public void SetOutputSurface(Surface? surface)
     {
-        _surface = surface;
-        _codec?.SetOutputSurface(_surface);
+        if (_surface != surface)
+        {
+            _surface = surface;
+            _codec?.SetOutputSurface(_surface);
+        }
+    }
+
+    public void DetachOutputSurface()
+    {
+        _surface = null;
+        _codec?.DetachOutputSurface();
     }
     /// <summary>
     /// Инициализация и запуск декодера
