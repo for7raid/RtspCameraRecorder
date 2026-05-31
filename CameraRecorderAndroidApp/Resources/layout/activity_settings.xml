@@ -177,6 +177,13 @@
           android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/btnFtpTest"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Проверить подключение"
+        android:layout_marginTop="8dp" />
+
     <!-- Запись -->
     <TextView
         android:layout_width="wrap_content"

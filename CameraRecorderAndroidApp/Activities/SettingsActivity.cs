@@ -1,9 +1,9 @@
 using CameraRecorder.Settings;
 using CameraRecorderAndroidApp.Services;
-using Java.Nio.FileNio;
+using FluentFTP;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CameraRecorderAndroidApp;
+namespace CameraRecorderAndroidApp.Activities;
 
 [Activity(Label = "Настройки")]
 public class SettingsActivity : Activity
@@ -15,6 +15,7 @@ public class SettingsActivity : Activity
     private EditText? etLocalPath;
     private Switch? swFtpEnabled, swFtps;
     private EditText? etFtpHost, etFtpLogin, etFtpPassword, etFtpDir, etFtpMaxAge, etFtpMaxStorage;
+    private Button? btnFtpTest;
     private SeekBar? sbPreMotion, sbPostMotion;
     private TextView? tvPreMotion, tvPostMotion;
 
@@ -53,6 +54,8 @@ public class SettingsActivity : Activity
         etFtpMaxAge = FindViewById<EditText>(Resource.Id.etFtpMaxFileAge)!;
         etFtpMaxStorage = FindViewById<EditText>(Resource.Id.etFtpMaxStorage)!;
         swFtps = FindViewById<Switch>(Resource.Id.swUseFtps)!;
+        btnFtpTest = FindViewById<Button>(Resource.Id.btnFtpTest)!;
+        btnFtpTest.Click += OnFtpTestClick;
 
         // Запись
         sbPreMotion = FindViewById<SeekBar>(Resource.Id.sbPreMotion)!;
@@ -76,6 +79,72 @@ public class SettingsActivity : Activity
             Toast.MakeText(this, "Настройки сохранены", ToastLength.Short)!.Show();
             Finish();
         };
+    }
+
+    private async void OnFtpTestClick(object? sender, EventArgs e)
+    {
+        var host = etFtpHost?.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            Toast.MakeText(this, "Укажите хост FTP", ToastLength.Short)!.Show();
+            return;
+        }
+
+        var login = etFtpLogin?.Text ?? "";
+        var password = etFtpPassword?.Text ?? "";
+        var dir = etFtpDir?.Text?.Trim() ?? "";
+        var useFtps = swFtps?.Checked ?? false;
+
+        if (btnFtpTest == null) return;
+        btnFtpTest.Enabled = false;
+        btnFtpTest.Text = "Проверка...";
+
+        try
+        {
+            using var client = new AsyncFtpClient(host, login, password);
+
+            if (useFtps)
+            {
+                client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
+                client.Config.ValidateAnyCertificate = true;
+            }
+
+            client.Config.ConnectTimeout = 10_000;
+            client.Config.DataConnectionConnectTimeout = 10_000;
+            client.Config.DataConnectionReadTimeout = 10_000;
+
+            await client.AutoConnect();
+
+            // Создаём временную папку и файл для проверки прав на запись
+            var testDir = string.IsNullOrEmpty(dir) ? "/" : dir.TrimEnd('/');
+            var tempDir = $"{testDir}/_camerarecorder_test_{Guid.NewGuid():N}";
+            var tempFile = $"{tempDir}/test.txt";
+
+            await client.CreateDirectory(tempDir);
+            await client.UploadBytes("ok"u8.ToArray(), tempFile);
+
+            // Удаляем за собой
+            await client.DeleteFile(tempFile);
+            await client.DeleteDirectory(tempDir);
+
+            await client.Disconnect();
+
+            RunOnUiThread(() =>
+                Toast.MakeText(this, "FTP подключение успешно ✅", ToastLength.Short)!.Show());
+        }
+        catch (Exception ex)
+        {
+            RunOnUiThread(() =>
+                Toast.MakeText(this, $"Ошибка FTP: {ex.Message}", ToastLength.Long)!.Show());
+        }
+        finally
+        {
+            if (btnFtpTest != null)
+            {
+                btnFtpTest.Enabled = true;
+                btnFtpTest.Text = "Проверить подключение";
+            }
+        }
     }
 
     private void Populate(CameraRecorderSettings s)
@@ -138,17 +207,19 @@ public class SettingsActivity : Activity
             LocalStorageEnabled = swLocalEnabled?.Checked ?? true,
             LocalRecordingsPath = etLocalPath?.Text ?? "",
 
-            Ftp = new FtpSettings
-            {
-                Enabled = true,
-                Host = etFtpHost?.Text ?? "",
-                Login = etFtpLogin?.Text ?? "",
-                Password = etFtpPassword?.Text ?? "",
-                Directory = etFtpDir?.Text ?? "",
-                UseFtps = swFtps?.Checked ?? false,
-                MaxFileAgeDays = int.TryParse(etFtpMaxAge?.Text, out var age) ? age : 10,
-                MaxStorageSizeMb = int.TryParse(etFtpMaxStorage?.Text, out var size) ? size : 2048,
-            },
+            Ftp = ftpEnabled
+                ? new FtpSettings
+                {
+                    Enabled = true,
+                    Host = etFtpHost?.Text ?? "",
+                    Login = etFtpLogin?.Text ?? "",
+                    Password = etFtpPassword?.Text ?? "",
+                    Directory = etFtpDir?.Text ?? "",
+                    UseFtps = swFtps?.Checked ?? false,
+                    MaxFileAgeDays = int.TryParse(etFtpMaxAge?.Text, out var age) ? age : 10,
+                    MaxStorageSizeMb = int.TryParse(etFtpMaxStorage?.Text, out var size) ? size : 2048,
+                }
+                : null,
 
             PreMotionDurationSec = sbPreMotion?.Progress ?? 10,
             PostMotionDurationSec = sbPostMotion?.Progress ?? 10,
