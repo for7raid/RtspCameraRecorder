@@ -3,7 +3,7 @@ namespace CameraRecorder.Settings;
 public class CameraRecorderSettings
 {
     /// <summary>
-    /// Путь основгого RTSP-потока (IP или домен)
+    /// Путь основного RTSP-потока (IP или домен)
     /// </summary>
     public string RtspMainStreamUrl { get; init; } = string.Empty;
 
@@ -33,34 +33,9 @@ public class CameraRecorderSettings
     public string LocalRecordingsPath { get; init; } = string.Empty;
 
     /// <summary>
-    /// FTP активно
+    /// Настройки FTP-хранилища. Если null — FTP не используется.
     /// </summary>
-    public bool FtpEnabled { get; init; }
-
-    /// <summary>
-    /// Хост FTP-сервера
-    /// </summary>
-    public string FtpHost { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Логин для FTP
-    /// </summary>
-    public string FtpLogin { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Пароль для FTP
-    /// </summary>
-    public string FtpPassword { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Использовать FTPS (FTP over SSL/TLS)
-    /// </summary>
-    public bool UseFtps { get; init; }
-
-    /// <summary>
-    /// Пусть на FTP сервере, куда загружать файлы
-    /// </summary>
-    public string FtpDirectory { get; set; }
+    public FtpSettings? Ftp { get; init; }
 
     /// <summary>
     /// Длительность записи до начала движения (размер кольцевого буфера, секунд)
@@ -72,10 +47,10 @@ public class CameraRecorderSettings
     /// </summary>
     public int PostMotionDurationSec { get; init; } = 10;
 
-    public static CameraRecorderSettings Default { get; } = new CameraRecorderSettings()
+    public static CameraRecorderSettings Default { get; } = new()
     {
-        RtspMainStreamUrl = " rtsp://192.168.1.8:554/stream1",
-        RtspSubStreamUrl = " rtsp://192.168.1.8:554/stream2",
+        RtspMainStreamUrl = "rtsp://192.168.1.8:554/stream1",
+        RtspSubStreamUrl = "rtsp://192.168.1.8:554/stream2",
         RtspLogin = "admin",
         RtspPassword = "123456",
         LocalStorageEnabled = true,

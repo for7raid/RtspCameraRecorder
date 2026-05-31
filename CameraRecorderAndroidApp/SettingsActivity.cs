@@ -8,11 +8,13 @@ namespace CameraRecorderAndroidApp;
 [Activity(Label = "Настройки")]
 public class SettingsActivity : Activity
 {
-
     private readonly ISettingsStorageService _settingsStorage;
+
     private EditText? etRtspMain, etRtspSub, etRtspLogin, etRtspPassword;
-    private Switch? swLocalEnabled, swFtpEnabled, swFtps;
-    private EditText? etLocalPath, etFtpHost, etFtpLogin, etFtpPassword, etFtpDir;
+    private Switch? swLocalEnabled;
+    private EditText? etLocalPath;
+    private Switch? swFtpEnabled, swFtps;
+    private EditText? etFtpHost, etFtpLogin, etFtpPassword, etFtpDir, etFtpMaxAge, etFtpMaxStorage;
     private SeekBar? sbPreMotion, sbPostMotion;
     private TextView? tvPreMotion, tvPostMotion;
 
@@ -26,11 +28,13 @@ public class SettingsActivity : Activity
         base.OnCreate(savedInstanceState);
         SetContentView(Resource.Layout.activity_settings);
 
-        // Bind views
+        // RTSP
         etRtspMain = FindViewById<EditText>(Resource.Id.etRtspMainStreamUrl)!;
         etRtspSub = FindViewById<EditText>(Resource.Id.etRtspSubStreamUrl)!;
         etRtspLogin = FindViewById<EditText>(Resource.Id.etRtspLogin)!;
         etRtspPassword = FindViewById<EditText>(Resource.Id.etRtspPassword)!;
+
+        // Локальное хранилище
         swLocalEnabled = FindViewById<Switch>(Resource.Id.swLocalStorageEnabled)!;
         etLocalPath = FindViewById<EditText>(Resource.Id.etLocalRecordingsPath)!;
         var btnPickFolder = FindViewById<Button>(Resource.Id.btnPickFolder)!;
@@ -39,12 +43,18 @@ public class SettingsActivity : Activity
             var intent = new Android.Content.Intent(Android.Content.Intent.ActionOpenDocumentTree);
             StartActivityForResult(intent, 42);
         };
+
+        // FTP
         swFtpEnabled = FindViewById<Switch>(Resource.Id.swFtpEnabled)!;
         etFtpHost = FindViewById<EditText>(Resource.Id.etFtpHost)!;
         etFtpLogin = FindViewById<EditText>(Resource.Id.etFtpLogin)!;
         etFtpPassword = FindViewById<EditText>(Resource.Id.etFtpPassword)!;
         etFtpDir = FindViewById<EditText>(Resource.Id.etFtpDirectory)!;
+        etFtpMaxAge = FindViewById<EditText>(Resource.Id.etFtpMaxFileAge)!;
+        etFtpMaxStorage = FindViewById<EditText>(Resource.Id.etFtpMaxStorage)!;
         swFtps = FindViewById<Switch>(Resource.Id.swUseFtps)!;
+
+        // Запись
         sbPreMotion = FindViewById<SeekBar>(Resource.Id.sbPreMotion)!;
         sbPostMotion = FindViewById<SeekBar>(Resource.Id.sbPostMotion)!;
         tvPreMotion = FindViewById<TextView>(Resource.Id.tvPreMotionValue)!;
@@ -62,7 +72,6 @@ public class SettingsActivity : Activity
         // Save
         btnSave.Click += async (_, _) =>
         {
-            //File.WriteAllText(etLocalPath?.Text + "/log.txt", "hello!");
             await _settingsStorage.SaveAsync(Collect());
             Toast.MakeText(this, "Настройки сохранены", ToastLength.Short)!.Show();
             Finish();
@@ -77,12 +86,17 @@ public class SettingsActivity : Activity
         etRtspPassword.Text = s.RtspPassword;
         swLocalEnabled.Checked = s.LocalStorageEnabled;
         etLocalPath.Text = s.LocalRecordingsPath;
-        swFtpEnabled.Checked = s.FtpEnabled;
-        etFtpHost.Text = s.FtpHost;
-        etFtpLogin.Text = s.FtpLogin;
-        etFtpPassword.Text = s.FtpPassword;
-        etFtpDir.Text = s.FtpDirectory;
-        swFtps.Checked = s.UseFtps;
+
+        var ftp = s.Ftp;
+        swFtpEnabled.Checked = ftp?.Enabled ?? false;
+        etFtpHost.Text = ftp?.Host ?? "";
+        etFtpLogin.Text = ftp?.Login ?? "";
+        etFtpPassword.Text = ftp?.Password ?? "";
+        etFtpDir.Text = ftp?.Directory ?? "";
+        etFtpMaxAge.Text = ftp?.MaxFileAgeDays.ToString() ?? "10";
+        etFtpMaxStorage.Text = ftp?.MaxStorageSizeMb.ToString() ?? "2048";
+        swFtps.Checked = ftp?.UseFtps ?? false;
+
         sbPreMotion.Progress = s.PreMotionDurationSec;
         sbPostMotion.Progress = s.PostMotionDurationSec;
         tvPreMotion.Text = s.PreMotionDurationSec.ToString();
@@ -94,14 +108,12 @@ public class SettingsActivity : Activity
         base.OnActivityResult(requestCode, resultCode, data);
         if (requestCode == 42 && resultCode == Result.Ok && data?.Data != null)
         {
-
             var uri = data.Data;
             var path = Android.Net.Uri.Decode(uri.LastPathSegment ?? "");
             if (path.StartsWith("primary:"))
                 path = path.Substring("primary:".Length);
             if (path.StartsWith("/tree/"))
                 path = path.Substring("/tree/".Length);
-            
 
             if (!OperatingSystem.IsAndroidVersionAtLeast(29))
             {
@@ -115,6 +127,8 @@ public class SettingsActivity : Activity
 
     private CameraRecorderSettings Collect()
     {
+        var ftpEnabled = swFtpEnabled?.Checked ?? false;
+
         return new CameraRecorderSettings
         {
             RtspMainStreamUrl = etRtspMain?.Text ?? "",
@@ -123,12 +137,19 @@ public class SettingsActivity : Activity
             RtspPassword = etRtspPassword?.Text ?? "",
             LocalStorageEnabled = swLocalEnabled?.Checked ?? true,
             LocalRecordingsPath = etLocalPath?.Text ?? "",
-            FtpEnabled = swFtpEnabled?.Checked ?? false,
-            FtpHost = etFtpHost?.Text ?? "",
-            FtpLogin = etFtpLogin?.Text ?? "",
-            FtpPassword = etFtpPassword?.Text ?? "",
-            FtpDirectory = etFtpDir?.Text ?? "",
-            UseFtps = swFtps?.Checked ?? false,
+
+            Ftp = new FtpSettings
+            {
+                Enabled = true,
+                Host = etFtpHost?.Text ?? "",
+                Login = etFtpLogin?.Text ?? "",
+                Password = etFtpPassword?.Text ?? "",
+                Directory = etFtpDir?.Text ?? "",
+                UseFtps = swFtps?.Checked ?? false,
+                MaxFileAgeDays = int.TryParse(etFtpMaxAge?.Text, out var age) ? age : 10,
+                MaxStorageSizeMb = int.TryParse(etFtpMaxStorage?.Text, out var size) ? size : 2048,
+            },
+
             PreMotionDurationSec = sbPreMotion?.Progress ?? 10,
             PostMotionDurationSec = sbPostMotion?.Progress ?? 10,
         };

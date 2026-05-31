@@ -147,6 +147,20 @@
         android:layout_height="wrap_content"
         android:hint="Директория на сервере" />
 
+    <EditText
+        android:id="@+id/etFtpMaxFileAge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Срок хранения, дней"
+        android:inputType="number" />
+
+    <EditText
+        android:id="@+id/etFtpMaxStorage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Макс. размер хранилища, МБ"
+        android:inputType="number" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -21,33 +21,30 @@ public sealed class FtpSink : IStorageSink
 
     public async Task SaveAsync(string fileName, byte[] data)
     {
-        var settings = _options.Value;
+        var ftp = _options.Value.Ftp;
 
-        if (!settings.FtpEnabled)
+        if (ftp is not { Enabled: true })
         {
             _logger.LogDebug("FtpSink: FTP отключён, пропускаю");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(settings.FtpHost))
+        if (string.IsNullOrWhiteSpace(ftp.Host))
         {
             _logger.LogDebug("FtpSink: хост не задан, пропускаю");
             return;
         }
 
-        var remotePath = BuildRemotePath(settings, fileName);
+        var remotePath = BuildRemotePath(ftp, fileName);
 
         _logger.LogDebug("FtpSink: загружаю {FileName} на {Path}", fileName, remotePath);
 
         try
         {
-            using var ftp = CreateClient(settings);
-
-            await ftp.AutoConnect();
-
-            await ftp.UploadBytes(data, remotePath, createRemoteDir: true);
-
-            await ftp.Disconnect();
+            using var client = CreateClient(ftp);
+            await client.AutoConnect();
+            await client.UploadBytes(data, remotePath, createRemoteDir: true);
+            await client.Disconnect();
 
             _logger.LogInformation("Файл загружен на FTP: {Path} ({Size} байт)", remotePath, data.Length);
         }
@@ -63,42 +60,40 @@ public sealed class FtpSink : IStorageSink
 
     public async Task<(string newFilePath, bool isMoved)> SaveAsync(string fileName, string tmpDataFilePath)
     {
-        var settings = _options.Value;
-        var remotePath = BuildRemotePath(settings, fileName);
+        var ftp = _options.Value.Ftp;
+
+        if (ftp is not { Enabled: true })
+            return (tmpDataFilePath, false);
+
+        var remotePath = BuildRemotePath(ftp, fileName);
 
         try
         {
-            using var ftp = CreateClient(settings);
-
-            await ftp.AutoConnect();
-
-            await ftp.UploadFile(tmpDataFilePath, remotePath, createRemoteDir: true);
-
-            await ftp.Disconnect();
+            using var client = CreateClient(ftp);
+            await client.AutoConnect();
+            await client.UploadFile(tmpDataFilePath, remotePath, createRemoteDir: true);
+            await client.Disconnect();
 
             _logger.LogInformation("Файл загружен на FTP: {Path}", remotePath);
-
             return (tmpDataFilePath, false);
         }
         catch (FtpException ex)
         {
-            _logger.LogError(ex, "FtpSink: ошибка FTP при загрузке {FileName}",
-                fileName);
-
+            _logger.LogError(ex, "FtpSink: ошибка FTP при загрузке {FileName}", fileName);
             return (tmpDataFilePath, false);
         }
     }
 
     // ── helpers ──
 
-    private static AsyncFtpClient CreateClient(CameraRecorderSettings settings)
+    private static AsyncFtpClient CreateClient(FtpSettings ftp)
     {
-        var client = new AsyncFtpClient(settings.FtpHost, settings.FtpLogin, settings.FtpPassword);
+        var client = new AsyncFtpClient(ftp.Host, ftp.Login, ftp.Password);
 
-        if (settings.UseFtps)
+        if (ftp.UseFtps)
         {
             client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
-            client.Config.ValidateAnyCertificate = true;   // для самоподписанных сертификатов
+            client.Config.ValidateAnyCertificate = true;
         }
 
         client.Config.ConnectTimeout = 15_000;
@@ -110,16 +105,10 @@ public sealed class FtpSink : IStorageSink
         return client;
     }
 
-    private static string BuildRemotePath(CameraRecorderSettings s, string fileName)
+    private static string BuildRemotePath(FtpSettings ftp, string fileName)
     {
-        var dir = (s.FtpDirectory ?? string.Empty).TrimEnd('/');
+        var dir = (ftp.Directory ?? string.Empty).TrimEnd('/');
         var name = fileName.StartsWith('/') ? fileName : "/" + fileName;
         return dir + name;
-    }
-
-    private static string? GetDirectoryName(string path)
-    {
-        var idx = path.LastIndexOf('/');
-        return idx > 0 ? path[..idx] : null;
     }
 }
