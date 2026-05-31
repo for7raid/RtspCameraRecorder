@@ -26,8 +26,7 @@ namespace RtspClientExample
             services.AddTransient<RtspRecorder>();
             services.AddTransient<RtspMotionDetector>();
             services.AddTransient<IMp4Logger, Mp4Logger>();
-            services.AddKeyedTransient<IH26xDecoder, H265FFMpegDecoder>("OnScreenDecoder");
-            services.AddKeyedTransient<IH26xDecoder, H265FFMpegDecoder>("OnBufferDecoder");
+            services.AddTransient<IH26xDecoder, H265FFMpegDecoder>();
             services.AddTransient<IFramesDumper, SharpMP4Dumper>();
 
             services.AddTransient<IStorageSink, LocalFileSink_>();

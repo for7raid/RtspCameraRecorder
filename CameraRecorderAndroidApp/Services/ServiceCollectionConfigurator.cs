@@ -35,8 +35,7 @@ namespace CameraRecorderAndroidApp.Services
             services.AddTransient<IStorageSink, AndroidLocalFileSink>();
             services.AddTransient<IStorageSink, FtpSink>();
 
-            services.AddKeyedTransient<IH26xDecoder, H265Decoder>("OnScreenDecoder");
-            services.AddKeyedTransient<IH26xDecoder, H265Decoder>("OnBufferDecoder");
+            services.AddTransient<IH26xDecoder, H265Decoder>();
 
             services.AddSingleton<LogWebServer>(sp => new LogWebServer(8080, logsDir, sp.GetRequiredService<IOptions<CameraRecorderSettings>>().Value.LocalRecordingsPath, sp.GetRequiredService<ILogger<LogWebServer>>()));
             services.AddSingleton<AlarmWebServer>();

@@ -1,6 +1,5 @@
 ﻿using CameraRecorder.RTSP;
 using CameraRecorder.Settings;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -52,7 +51,7 @@ public class RtspRecorder
         RTSPClient client,
         RingBufferStorage bufferVideoStorage,
         IFramesDumper framesDumper,
-        [FromKeyedServices("OnScreenDecoder")] IH26xDecoder? h26XDecoder,
+        IH26xDecoder? h26XDecoder,
         IOptions<CameraRecorderSettings> options)
     {
         _client = client;
