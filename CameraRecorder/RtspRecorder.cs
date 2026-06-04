@@ -8,6 +8,7 @@ namespace CameraRecorder;
 public class RtspRecorder
 {
     public IH26xDecoder? H26XDecoder { get; init; }
+    public IScreenshotCapturer? ScreenshotCapturer { get; init; }
 
     private readonly ILogger<RtspRecorder> _logger;
     private readonly RTSPClient _client;
@@ -52,7 +53,8 @@ public class RtspRecorder
         RingBufferStorage bufferVideoStorage,
         IFramesDumper framesDumper,
         IH26xDecoder? h26XDecoder,
-        IOptions<CameraRecorderSettings> options)
+        IOptions<CameraRecorderSettings> options,
+        IScreenshotCapturer? screenshotCapturer = null)
     {
         _client = client;
         H26XDecoder = h26XDecoder;
@@ -60,6 +62,7 @@ public class RtspRecorder
         _bufferVideoStorage = bufferVideoStorage;
         _framesDumper = framesDumper;
         _logger = logger;
+        ScreenshotCapturer = screenshotCapturer;
 
 
         client.SetupAudioPayload(ProfilePCMU, ReceiveAudioPCMx);
@@ -86,6 +89,7 @@ public class RtspRecorder
             _bufferVideoStorage.StartRecord();
             //_logger.LogInformation("Запись началась");
             RecordingStarted?.Invoke();
+            ScreenshotCapturer?.OnRecordStarted(DateTime.Now);
         }
     }
 
@@ -101,6 +105,7 @@ public class RtspRecorder
             //_logger.LogInformation("Запись остановлена");
             RecordingStopped?.Invoke();
             RecordingDurationChanged?.Invoke(TimeSpan.Zero);
+            ScreenshotCapturer?.OnRecordStopped();
         }
     }
     void ReceiveAudioPCMx(RTSPClient client, SimpleDataEventArgs dataArgs)
@@ -163,4 +168,3 @@ public class RtspRecorder
         }
     }
 }
-

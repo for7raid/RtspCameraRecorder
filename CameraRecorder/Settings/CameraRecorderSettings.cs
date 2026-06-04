@@ -28,6 +28,11 @@ public class CameraRecorderSettings
     public LocalStorageSettings? LocalStorage { get; init; }
 
     /// <summary>
+    /// Настройки скриншотов. Если null — скриншоты не делаются.
+    /// </summary>
+    public ScreenshotSettings? Screenshots { get; init; }
+
+    /// <summary>
     /// Настройки FTP-хранилища. Если null — FTP не используется.
     /// </summary>
     public FtpSettings? Ftp { get; init; }

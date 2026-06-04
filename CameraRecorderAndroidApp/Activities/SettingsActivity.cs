@@ -15,6 +15,8 @@ public class SettingsActivity : Activity
     private EditText? etLocalPath, etLocalMaxAge, etLocalMaxStorage;
     private Switch? swFtpEnabled, swFtps;
     private EditText? etFtpHost, etFtpLogin, etFtpPassword, etFtpDir, etFtpMaxAge, etFtpMaxStorage;
+    private Switch? swScreenshotsEnabled;
+    private EditText? etScreenshotTimestamps;
     private Button? btnFtpTest;
     private SeekBar? sbPreMotion, sbPostMotion;
     private TextView? tvPreMotion, tvPostMotion;
@@ -58,6 +60,10 @@ public class SettingsActivity : Activity
         swFtps = FindViewById<Switch>(Resource.Id.swUseFtps)!;
         btnFtpTest = FindViewById<Button>(Resource.Id.btnFtpTest)!;
         btnFtpTest.Click += OnFtpTestClick;
+
+        // Скриншоты
+        swScreenshotsEnabled = FindViewById<Switch>(Resource.Id.swScreenshotsEnabled)!;
+        etScreenshotTimestamps = FindViewById<EditText>(Resource.Id.etScreenshotTimestamps)!;
 
         // Запись
         sbPreMotion = FindViewById<SeekBar>(Resource.Id.sbPreMotion)!;
@@ -172,6 +178,11 @@ public class SettingsActivity : Activity
         etFtpMaxStorage.Text = ftp?.MaxStorageSizeMb.ToString() ?? "2048";
         swFtps.Checked = ftp?.UseFtps ?? false;
 
+        var screenshots = s.Screenshots;
+        swScreenshotsEnabled.Checked = screenshots?.Enabled ?? false;
+        etScreenshotTimestamps.Text = screenshots != null
+            ? string.Join(",", screenshots.TimestampsSec) : "3,5,10";
+
         sbPreMotion.Progress = s.PreMotionDurationSec;
         sbPostMotion.Progress = s.PostMotionDurationSec;
         tvPreMotion.Text = s.PreMotionDurationSec.ToString();
@@ -204,6 +215,7 @@ public class SettingsActivity : Activity
     {
         var localEnabled = swLocalEnabled?.Checked ?? false;
         var ftpEnabled = swFtpEnabled?.Checked ?? false;
+        var screenshotsEnabled = swScreenshotsEnabled?.Checked ?? false;
 
         return new CameraRecorderSettings
         {
@@ -231,8 +243,27 @@ public class SettingsActivity : Activity
                 MaxStorageSizeMb = int.TryParse(etFtpMaxStorage?.Text, out var sizeF) ? sizeF : 2048,
             },
 
+            Screenshots = new ScreenshotSettings
+            {
+                Enabled = true,
+                TimestampsSec = ParseTimestamps(etScreenshotTimestamps?.Text),
+            },
+
             PreMotionDurationSec = sbPreMotion?.Progress ?? 10,
             PostMotionDurationSec = sbPostMotion?.Progress ?? 10,
         };
+    }
+
+    private static int[] ParseTimestamps(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return [3, 5, 10];
+
+        return text.Split(',')
+            .Select(s => int.TryParse(s.Trim(), out var n) ? n : -1)
+            .Where(n => n > 0)
+            .Distinct()
+            .OrderBy(n => n)
+            .ToArray();
     }
 }

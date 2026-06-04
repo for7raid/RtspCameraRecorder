@@ -20,6 +20,7 @@ namespace CameraRecorderAndroidApp.Activities
         public TextView? txtView3 { get; private set; }
         private ILogger<MainActivity> _logger;
         private readonly LogWebServer _webServer;
+        private TextureView? _textureView;
 
         private readonly CircularBuffer<DateTime> _lastRecords = new(5);
 
@@ -73,8 +74,6 @@ namespace CameraRecorderAndroidApp.Activities
 
                     _lastRecords.Add(DateTime.Now);
 
-
-
                     txtLastRecording.Text = _lastRecords.Ordered.Select(d => "🏃‍ " + d.ToString("HH:mm")).Aggregate((a, v) => a + "    " + v);
                 });
             };
@@ -89,26 +88,24 @@ namespace CameraRecorderAndroidApp.Activities
             txtLastRecording = FindViewById<TextView>(Resource.Id.txtLastRecording);
             txtMotionLog = FindViewById<TextView>(Resource.Id.txtMotionLog);
 
-
-            // Отрисовка напрямую аппаратным декодером → ждём готовности Surface
-            var surfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1)!;
-            surfaceView.Holder!.AddCallback(new SurfaceCb(() =>
+            // TextureView: создаём Surface из SurfaceTexture
+            _textureView = FindViewById<TextureView>(Resource.Id.textureView1)!;
+            _textureView.SurfaceTextureListener = new SurfaceTextureCb(surfaceTexture =>
             {
-
-                if (_rtspRecorder.H26XDecoder is H265Decoder h265Decoder)
-                {
-                    h265Decoder.SetOutputSurface(surfaceView.Holder!.Surface);
-                }
-
+                var surface = new Android.Views.Surface(surfaceTexture);
+                if (_rtspRecorder.H26XDecoder is H265Decoder decoder)
+                    decoder.SetOutputSurface(surface);
             },
             () =>
             {
-                if (_rtspRecorder.H26XDecoder is H265Decoder h265Decoder)
-                {
-                    h265Decoder.DetachOutputSurface();
-                }
+                if (_rtspRecorder.H26XDecoder is H265Decoder decoder)
+                    decoder.DetachOutputSurface();
+            });
 
-            }));
+            if (_rtspRecorder.ScreenshotCapturer is ScreenshotCapture _screenshotCapture)
+            {
+                _screenshotCapture.SetTextureView(_textureView, _rtspRecorder.H26XDecoder);
+            }
 
             _rtspRecorder.Start();
             _rtspMotionDetector.Start();
@@ -137,22 +134,23 @@ namespace CameraRecorderAndroidApp.Activities
 
             btnStop = FindViewById<Button>(Resource.Id.btnStopRecord)!;
             btnStop.Click += (_, _) => _rtspRecorder.StopRecord();
-
-
         }
     }
 
-    class SurfaceCb : Java.Lang.Object, ISurfaceHolderCallback
+    class SurfaceTextureCb : Java.Lang.Object, TextureView.ISurfaceTextureListener
     {
-        private readonly Action _onCreated;
+        private readonly Action<Android.Graphics.SurfaceTexture> _onAvailable;
         private readonly Action _onDestroyed;
-        public SurfaceCb(Action onCreated, Action onDestroyed)
+        public SurfaceTextureCb(Action<Android.Graphics.SurfaceTexture> onAvailable, Action onDestroyed)
         {
-            _onCreated = onCreated;
+            _onAvailable = onAvailable;
             _onDestroyed = onDestroyed;
         }
-        public void SurfaceCreated(ISurfaceHolder? holder) => _onCreated();
-        public void SurfaceDestroyed(ISurfaceHolder? holder) => _onDestroyed();
-        public void SurfaceChanged(ISurfaceHolder? holder, Android.Graphics.Format format, int w, int h) { }
+        public void OnSurfaceTextureAvailable(Android.Graphics.SurfaceTexture surface, int w, int h)
+            => _onAvailable(surface);
+        public bool OnSurfaceTextureDestroyed(Android.Graphics.SurfaceTexture surface)
+        { _onDestroyed(); return true; }
+        public void OnSurfaceTextureSizeChanged(Android.Graphics.SurfaceTexture surface, int w, int h) { }
+        public void OnSurfaceTextureUpdated(Android.Graphics.SurfaceTexture surface) { }
     }
 }

@@ -106,6 +106,16 @@ public class LogWebServer
                 _logger.LogInformation("Запрос удаления записи '{File}' от {Remote}", fileName, remote);
                 ServeDeleteRec(ctx, fileName);
             }
+            else if (path is "/screenshots" or "")
+            {
+                _logger.LogInformation("Запрос галереи скриншотов от {Remote}", remote);
+                ServeScreenshotGallery(ctx);
+            }
+            else if (path.StartsWith("/screenshots/") && ctx.Request.HttpMethod == "GET")
+            {
+                var fileName = Uri.UnescapeDataString(path.Substring(13));
+                ServeRecFile(ctx, fileName);  // тот же механизм Range-отдачи
+            }
             else
             {
                 _logger.LogWarning("Неизвестный запрос '{Path}' от {Remote}", path, remote);
@@ -242,8 +252,14 @@ public class LogWebServer
         var fileInfo = new FileInfo(path);
         long total = fileInfo.Length;
 
-        ctx.Response.ContentType = fileName.EndsWith(".mp4") ? "video/mp4" : "audio/wav";
+        ctx.Response.ContentType = Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".mp4" => "video/mp4",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            _ => "audio/wav",
+        };
         ctx.Response.AddHeader("Accept-Ranges", "bytes");
+        ctx.Response.AddHeader("Cache-Control", "public, max-age=2592000");
 
         var range = ctx.Request.Headers["Range"];
         if (range != null && range.StartsWith("bytes="))
@@ -330,6 +346,30 @@ public class LogWebServer
         var bytes = Encoding.UTF8.GetBytes(sb.ToString());
         ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
         ctx.Response.Close();
+    }
+
+    private void ServeScreenshotGallery(HttpListenerContext ctx)
+    {
+        if (!Directory.Exists(_recDir))
+        {
+            WriteHtml(ctx, LoadTemplate(Resource.Raw.screenshot_gallery)
+                .Replace("{{TILES}}", "<div class='empty'>Нет скриншотов</div>"));
+            return;
+        }
+
+        var files = Directory.GetFiles(_recDir, "*.jpg")
+            .Select(f => new FileInfo(f))
+            .OrderByDescending(f => f.CreationTime)
+            .Select(f => LoadTemplate(Resource.Raw.screenshot_tile)
+                .Replace("{{URL}}", Uri.EscapeDataString(f.Name))
+                .Replace("{{NAME}}", f.Name))
+            .ToArray();
+
+        var tiles = files.Length > 0
+            ? string.Join("\n", files)
+            : "<div class='empty'>Нет скриншотов</div>";
+
+        WriteHtml(ctx, LoadTemplate(Resource.Raw.screenshot_gallery).Replace("{{TILES}}", tiles));
     }
 
     private static void WriteText(HttpListenerContext ctx, string text)

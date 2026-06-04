@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Скриншоты</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --accent: #4caf50;
+            --text: #e0e0e0;
+            --muted: #888;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, "Segoe UI", sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .header {
+            padding: 12px 16px;
+            background: var(--surface);
+            border-bottom: 2px solid var(--accent);
+        }
+        .header h2 { color: var(--accent); font-size: 18px; }
+        .header a { color: #64b5f6; font-size: 13px; text-decoration: none; }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            padding: 12px;
+        }
+        .tile {
+            background: var(--surface);
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .tile:hover { transform: scale(1.03); }
+        .tile img {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            display: block;
+        }
+        .tile .label {
+            padding: 6px 8px;
+            font-size: 12px;
+            color: var(--muted);
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
+        }
+
+        /* Лайтбокс */
+        .lightbox {
+            display: none;
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.92);
+            align-items: center; justify-content: center;
+        }
+        .lightbox.active { display: flex; }
+        .lightbox img {
+            max-width: 95vw; max-height: 90vh;
+            object-fit: contain;
+        }
+        .lightbox .close {
+            position: absolute; top: 16px; right: 24px;
+            font-size: 32px; color: #fff; cursor: pointer;
+        }
+        .lightbox .nav {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            font-size: 36px; color: #fff; cursor: pointer;
+            user-select: none; padding: 16px;
+        }
+        .lightbox .nav.prev { left: 8px; }
+        .lightbox .nav.next { right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>📸 Скриншоты</h2>
+        <a href="/rec">Записи</a>
+    </div>
+
+    <div class="gallery" id="gallery">{{TILES}}</div>
+
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <span class="close">&times;</span>
+        <span class="nav prev" onclick="event.stopPropagation(); navLightbox(-1)">&lsaquo;</span>
+        <img id="lightboxImg" src="" />
+        <span class="nav next" onclick="event.stopPropagation(); navLightbox(1)">&rsaquo;</span>
+    </div>
+
+    <script>
+        const images = [];
+        document.querySelectorAll('.tile').forEach(t => images.push(t.dataset.url));
+        let lbIdx = 0;
+
+        function openLightbox(url) {
+            lbIdx = images.indexOf(url);
+            document.getElementById('lightboxImg').src = '/screenshots/' + url;
+            document.getElementById('lightbox').classList.add('active');
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+        function navLightbox(dir) {
+            if (images.length === 0) return;
+            lbIdx = (lbIdx + dir + images.length) % images.length;
+            document.getElementById('lightboxImg').src = '/screenshots/' + images[lbIdx];
+        }
+        document.addEventListener('keydown', e => {
+            if (!document.getElementById('lightbox').classList.contains('active')) return;
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') navLightbox(-1);
+            if (e.key === 'ArrowRight') navLightbox(1);
+        });
+    </script>
+</body>
+</html>

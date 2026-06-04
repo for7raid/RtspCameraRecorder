@@ -38,36 +38,45 @@ public sealed class AndroidLocalFileSink : IStorageSink
 
         try
         {
+            //if (OperatingSystem.IsAndroidVersionAtLeast(29))
+            //{
+            //var mimeType = Path.GetExtension(fileName) switch
+            //{
+            //    ".wav" => "audio/wav",
+            //    ".aac" => "audio/aac",
+            //    ".jpeg" => "image/jpeg",
+            //    _ => "video/mp4",
+            //};
+
+            //var context = Android.App.Application.Context;
+            //var resolver = context.ContentResolver!;
+            //Android.Content.ContentValues contentValues = new();
+            //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
+            //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, mimeType);
+            //contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, local.Path);
+
+            //var imageUri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, contentValues);
+
+            //using var os = resolver.OpenOutputStream(imageUri);
+            //await stream.CopyToAsync(os!);
+            //_logger.LogInformation("Файл сохранён локально: {Path} {fileName}", imageUri, fileName);
+
+
+            //}
+            //else
+            //{
+            string path = Path.Combine(local.Path, fileName);
+
             if (OperatingSystem.IsAndroidVersionAtLeast(29))
             {
-                var mimeType = Path.GetExtension(fileName) switch
-                {
-                    ".wav" => "audio/wav",
-                    ".aac" => "audio/aac",
-                    _ => "video/mp4",
-                };
-
-                var context = Android.App.Application.Context;
-                var resolver = context.ContentResolver!;
-                Android.Content.ContentValues contentValues = new();
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, mimeType);
-                contentValues.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, local.Path);
-
-                var imageUri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, contentValues);
-
-                using var os = resolver.OpenOutputStream(imageUri);
-                await stream.CopyToAsync(os!);
-                _logger.LogInformation("Файл сохранён локально: {Path} {fileName}", imageUri, fileName);
+                path = Path.Combine(Android.OS.Environment.ExternalStorageDirectory.AbsolutePath, local.Path, fileName);
             }
-            else
-            {
-                string path = Path.Combine(local.Path, fileName);
-                using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None,
-                   bufferSize: 81920, useAsync: true);
-                await stream.CopyToAsync(fs);
-                _logger.LogInformation("Файл сохранён локально: {Path}", path);
-            }
+
+            using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None,
+               bufferSize: 81920, useAsync: true);
+            await stream.CopyToAsync(fs);
+            _logger.LogInformation("Файл сохранён локально: {Path}", path);
+            //}
         }
         catch (Exception ex)
         {

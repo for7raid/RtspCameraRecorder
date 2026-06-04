@@ -34,6 +34,12 @@ public class H265Decoder : IH26xDecoder, IDisposable
     private readonly ILogger<H265Decoder> _logger;
     Surface? _surface;
 
+    /// <summary>Ширина видео после парсинга SPS</summary>
+    public int VideoWidth => _width;
+
+    /// <summary>Высота видео после парсинга SPS</summary>
+    public int VideoHeight => _height;
+
     /// <summary>
     /// Событие возникает при декодировании нового кадра
     /// </summary>

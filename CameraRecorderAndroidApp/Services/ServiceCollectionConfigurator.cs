@@ -36,6 +36,8 @@ namespace CameraRecorderAndroidApp.Services
 
             services.AddTransient<IH26xDecoder, H265Decoder>();
 
+            services.AddTransient<IScreenshotCapturer, ScreenshotCapture>();
+
             services.AddSingleton<LogWebServer>();
             services.AddSingleton<AlarmWebServer>();
 
